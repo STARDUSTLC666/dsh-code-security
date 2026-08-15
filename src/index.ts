@@ -2,7 +2,7 @@
  * dsh-secure-review —— AI 代码安全审查插件（node 半身，配置走 cordis.patch.yml）。
  *
  * 插件导出 apply(ctx, config)：注册 secure_scan / secure_diff / secure_fix_verify /
- * secure_report / secure_policy_show / secure_policy_set 六个工具。扫描为纯确定性规则，
+ * secure_report / secure_export / secure_policy_show / secure_policy_set 七个工具。扫描为纯确定性规则，
  * git diff 通过官方 subprocess 服务执行，零运行时依赖。
  *
  * @module dsh-secure-review

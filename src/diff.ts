@@ -30,8 +30,10 @@ export interface DiffScanResult {
 }
 
 /** 运行 git diff（默认 HEAD，工作区未提交改动）。 */
-export async function runGitDiff(runner: ProcessRunner, cwd: string, base: string, target?: string, timeoutMs = 30000): Promise<string> {
-  const argv = ['git', 'diff', '--no-ext-diff', '--unified=0', base]
+export async function runGitDiff(runner: ProcessRunner, cwd: string, base: string, target?: string, timeoutMs = 30000, staged = false): Promise<string> {
+  const argv = ['git', 'diff']
+  if (staged) argv.push('--cached')
+  argv.push('--no-ext-diff', '--unified=0', base)
   if (target !== undefined && target.trim() !== '') argv.push('--', target.trim())
   const result = await runner.run(argv, { timeoutMs })
   if (result.exitCode !== 0 && result.exitCode !== 1) {

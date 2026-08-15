@@ -12,10 +12,11 @@ DeepSeek Harness AI 代码安全审查插件：确定性规则引擎 + git diff 
 | `secure_diff` | 只审查 git diff 新增行 | 写状态 |
 | `secure_fix_verify` | 修复后复扫：关闭 / 仍存在 / 新引入 | 写状态 |
 | `secure_report` | 按规则/文件聚合 + 门禁结论 | 否 |
+| `secure_export` | 导出 SARIF 2.1.0 / Markdown 报告 | 写文件审批 |
 | `secure_policy_show` | 查看 .secure-review.json 策略 | 否 |
 | `secure_policy_set` | 写入策略（排除/忽略/阈值） | 审批门 |
 
-## 规则覆盖（30+）
+## 规则覆盖（40+）
 
 - 注入：eval / exec / shell=True / SQL 拼接 / innerHTML
 - 反序列化：pickle / yaml.load / ObjectInputStream / Marshal / unserialize
@@ -54,7 +55,7 @@ secure_fix_verify { target: src }
 ## 工程
 
 ```bash
-pnpm test       # 构建 + 15 个测试
+pnpm test       # 构建 + 19 个测试
 ```
 
 MIT

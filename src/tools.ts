@@ -1,14 +1,17 @@
 /**
- * 六个面向模型的安全审查工具：
- * secure_scan / secure_diff / secure_fix_verify / secure_report / secure_policy_show / secure_policy_set。
+ * 七个面向模型的安全审查工具：
+ * secure_scan / secure_diff / secure_fix_verify / secure_report / secure_export /
+ * secure_policy_show / secure_policy_set。
  *
  * @module dsh-secure-review/tools
  */
 
+import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { optionalString, requiredString, type ResolvedSecureConfig, type Severity } from './config.js'
 import { runGitDiff, scanDiff } from './diff.js'
 import { loadPolicy, normalizePolicy, POLICY_FILE, savePolicy, type SecurePolicy } from './policy.js'
+import { ruleCategory } from './rules.js'
 import type { ProcessRunner } from './runner.js'
 import { scanPath, type Finding } from './scanner.js'
 import { compareFingerprints, countFindings, findingFingerprint, loadState, saveState } from './state.js'
@@ -123,10 +126,11 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
 
   const secureDiff: SecureToolDefinition = {
     name: 'secure_diff',
-    description: '只审查 git diff 的新增行（默认 HEAD，即未提交改动）。base 可用任意 git ref；target 可限定文件。结果同样写入状态。',
+    description: '只审查 git diff 的新增行（默认 HEAD，即未提交改动）。base 可用任意 git ref；staged=true 审查已暂存改动；target 可限定文件。结果同样写入状态。',
     parameters: compileParameters({
       base: { type: 'string', description: 'git 基线（默认 HEAD）。' },
       target: { type: 'string', description: '限定文件路径（可选）。' },
+      staged: { type: 'boolean', description: '审查已暂存改动（git diff --cached，默认 false）。' },
     }),
     output: { schema: scanSchema, render: renderFindings },
     async execute(rawArgs: unknown) {
@@ -135,7 +139,7 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
       const target = optionalString(args, 'target')
       const policy = await loadPolicy(cwd)
       const failOn = policy.failOn ?? cfg.failOn
-      const diff = await runGitDiff(runner, cwd, base, target)
+      const diff = await runGitDiff(runner, cwd, base, target, 30000, args.staged === true)
       const result = scanDiff(diff, cwd, policy)
       const counts = countFindings(result.findings)
       const entry = {
@@ -242,7 +246,7 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
         stateFile: stateDir,
         policy,
         counts: last.counts,
-        byRule: [...byRule.entries()].sort((a, b) => b[1] - a[1]).map(([rule, count]) => ({ rule, count })),
+        byRule: [...byRule.entries()].sort((a, b) => b[1] - a[1]).map(([rule, count]) => ({ rule, count, category: ruleCategory(rule) })),
         byFile: [...byFile.entries()].sort((a, b) => b[1] - a[1]).slice(0, 50).map(([file, count]) => ({ file, count })),
         passed: verdictOf(last.findings, failOn),
         historyCount: state.history.length,
@@ -308,5 +312,80 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
     return { kind: 'deny', reason: '策略写入未获批准。' }
   }
 
-  return [secureScan, secureDiff, secureFixVerify, secureReport, policyShow, policySet]
+  const secureExport: SecureToolDefinition = {
+    name: 'secure_export',
+    description: '把最近一次扫描结果导出为 SARIF 2.1.0 或 Markdown。path 可选：提供时写入文件（写操作需要审批）。',
+    parameters: compileParameters({
+      format: { type: 'string', enum: ['sarif', 'markdown'], description: '导出格式（默认 sarif）。' },
+      path: { type: 'string', description: '输出文件路径（可选，缺省只返回文本）。' },
+    }),
+    output: {
+      schema: {
+        type: 'object',
+        properties: { format: { type: 'string' }, path: { type: 'string' }, text: { type: 'string' }, findingCount: { type: 'integer' } },
+        additionalProperties: true,
+      },
+      render: (_args, value) => {
+        const rec = (value ?? {}) as Record<string, unknown>
+        return [{ type: 'text', text: '已导出 ' + String(rec.findingCount ?? 0) + ' 条发现（' + String(rec.format ?? '') + '）。' }]
+      },
+    },
+    async execute(rawArgs: unknown) {
+      const args = (rawArgs ?? {}) as Record<string, unknown>
+      const format = args.format === 'markdown' ? 'markdown' : 'sarif'
+      const target = optionalString(args, 'path')
+      const state = await loadState(stateDir)
+      if (state.last === null) throw new Error('尚无扫描结果，请先执行 secure_scan 或 secure_diff。')
+      const text = format === 'sarif' ? buildSarif(state.last.findings, state.last.target) : buildMarkdown(state.last.findings, state.last.target)
+      if (target !== undefined) await writeFile(target, text, 'utf8')
+      return { format, path: target ?? '', text, findingCount: state.last.findings.length }
+    },
+    timeoutMs: 30000,
+  }
+
+  secureExport.gate = async (exec: unknown, next: () => Promise<unknown>) => {
+    const record = (typeof exec === 'object' && exec !== null ? exec : {}) as Record<string, unknown>
+    const args = (typeof record.args === 'object' && record.args !== null ? record.args : {}) as Record<string, unknown>
+    const target = typeof args.path === 'string' && args.path !== '' ? args.path : ''
+    if (target === '') return next()
+    const approval = record.approval as { request(options: { reason: string }): Promise<string> } | undefined
+    if (approval === undefined) return { kind: 'deny', reason: 'secure_export 写入文件需要确认，但当前环境没有审批通道。' }
+    const outcome = await approval.request({ reason: '导出安全报告到 ' + target })
+    if (outcome === 'allowed-once') return next()
+    if (outcome === 'cancelled') return { kind: 'deny', reason: '导出被取消，未执行。' }
+    return { kind: 'deny', reason: '导出未获批准。' }
+  }
+
+  return [secureScan, secureDiff, secureFixVerify, secureReport, secureExport, policyShow, policySet]
+}
+
+function buildMarkdown(findings: Finding[], target: string): string {
+  const lines = ['# 安全审查报告', '', '目标：' + target, '', '| 严重度 | 规则 | CWE | 文件:行 | 说明 |', '| :-- | :-- | :-- | :-- | :-- |']
+  for (const finding of findings) {
+    lines.push('| ' + finding.severity + ' | ' + finding.ruleId + ' | ' + finding.cwe + ' | ' + finding.file + ':' + finding.line + ' | ' + finding.message + ' |')
+  }
+  return lines.join('\n') + '\n'
+}
+
+function buildSarif(findings: Finding[], target: string): string {
+  const rules = new Map<string, { id: string; name: string; shortDescription: string }>()
+  const results = findings.map((finding, index) => {
+    rules.set(finding.ruleId, { id: finding.ruleId, name: finding.title, shortDescription: finding.title })
+    return {
+      ruleId: finding.ruleId,
+      level: finding.severity === 'critical' || finding.severity === 'high' ? 'error' : finding.severity === 'medium' ? 'warning' : 'note',
+      message: { text: finding.message },
+      locations: [{ physicalLocation: { artifactLocation: { uri: finding.file.replace(/\\/g, '/') }, region: { startLine: finding.line } } }],
+      partialFingerprints: { primaryLocationLineHash: finding.id + ':' + String(index) },
+    }
+  })
+  return JSON.stringify({
+    version: '2.1.0',
+    $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
+    runs: [{
+      tool: { driver: { name: 'dsh-secure-review', version: '0.1.0', informationUri: 'https://github.com/STARDUSTLC666/dsh-secure-review', rules: [...rules.values()] } },
+      originalUriBaseIds: { ROOTPATH: { uri: 'file:///' + target.replace(/\\/g, '/') } },
+      results,
+    }],
+  }, null, 2)
 }

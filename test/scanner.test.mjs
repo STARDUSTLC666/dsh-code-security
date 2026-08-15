@@ -81,3 +81,31 @@ test('node_modules 默认排除', async () => {
   assert.equal(result.findings.filter(f => f.ruleId === 'SEC-001').length, 1)
   await fs.rm(dir, { recursive: true, force: true })
 })
+
+test('PHP/Java/Ruby 命令执行规则命中', async () => {
+  const dir = await tmpProject({
+    'bad.php': 'system($_GET["cmd"]);\n',
+    'Bad.java': 'Runtime.getRuntime().exec(cmd);\n',
+    'bad.rb': 'system("ls " + arg)\n',
+  })
+  const cfg = resolveConfig(null, dir)
+  const result = await scanPath({ cwd: dir, maxFiles: cfg.maxFiles, maxFileBytes: cfg.maxFileBytes, policy: await loadPolicy(dir) })
+  const ids = new Set(result.findings.map(f => f.ruleId))
+  assert.ok(ids.has('SEC-011'))
+  assert.ok(ids.has('SEC-013'))
+  assert.ok(ids.has('SEC-012'))
+  await fs.rm(dir, { recursive: true, force: true })
+})
+
+test('.env 与 GitHub Actions 规则命中', async () => {
+  const dir = await tmpProject({
+    '.env': 'API_KEY=abcd1234\n',
+    '.github/workflows/ci.yml': 'jobs:\n  build:\n    steps:\n      - uses: actions/checkout@main\n',
+  })
+  const cfg = resolveConfig(null, dir)
+  const result = await scanPath({ cwd: dir, maxFiles: cfg.maxFiles, maxFileBytes: cfg.maxFileBytes, policy: await loadPolicy(dir) })
+  const ids = new Set(result.findings.map(f => f.ruleId))
+  assert.ok(ids.has('SEC-305'))
+  assert.ok(ids.has('SEC-407'))
+  await fs.rm(dir, { recursive: true, force: true })
+})

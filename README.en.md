@@ -12,10 +12,11 @@ A DeepSeek Harness plugin for AI code security review: deterministic rule engine
 | `secure_diff` | Review only added lines of git diff | state |
 | `secure_fix_verify` | Compare with baseline: closed / remaining / fresh | state |
 | `secure_report` | Aggregate by rule/file with gate verdict | no |
+| `secure_export` | Export SARIF 2.1.0 / Markdown | file write approval |
 | `secure_policy_show` | Show .secure-review.json | no |
 | `secure_policy_set` | Replace policy JSON | approval |
 
-30+ deterministic rules: injection, deserialization, weak crypto, secrets, dangerous config, sensitive logging, path traversal, SSRF.
+40+ deterministic rules: injection, deserialization, weak crypto, secrets, dangerous config, sensitive logging, path traversal, SSRF.
 
 ```bash
 dsh plugin --profile web add dsh-secure-review

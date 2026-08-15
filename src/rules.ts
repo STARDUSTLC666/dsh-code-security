@@ -20,11 +20,12 @@ export interface SecurityRule {
   fileLevel?: boolean
 }
 
-const JS: Language[] = ['javascript', 'any']
-const PY: Language[] = ['python', 'any']
-const JAVA: Language[] = ['java', 'any']
-const SHELL: Language[] = ['shell', 'any']
-const DOCKER: Language[] = ['dockerfile', 'any']
+const JS: Language[] = ['javascript']
+const PY: Language[] = ['python']
+const JAVA: Language[] = ['java']
+const SHELL: Language[] = ['shell']
+const YAML: Language[] = ['yaml']
+const DOCKER: Language[] = ['dockerfile']
 const ALL: Language[] = ['any']
 
 export const RULES: readonly SecurityRule[] = Object.freeze([
@@ -69,7 +70,35 @@ export const RULES: readonly SecurityRule[] = Object.freeze([
 
   { id: 'SEC-601', title: '路径拼接来自请求参数', cwe: 'CWE-22', severity: 'high', confidence: 'medium', languages: JS, patterns: [/(?:path\.join|readFile(?:Sync)?|writeFile(?:Sync)?|open(?:Sync)?)\s*\([^)]*(?:req|request)\.(?:query|params|body)/i], message: '文件路径由请求参数参与拼接。' },
   { id: 'SEC-602', title: 'SSRF：请求目标来自用户输入', cwe: 'CWE-918', severity: 'high', confidence: 'medium', languages: JS, patterns: [/(?:fetch|axios\.get|axios\(|request\()\s*\(\s*(?:req|request)\.(?:query|params|body)/i], message: '请求 URL 直接取自用户输入。' },
+
+  { id: 'SEC-011', title: 'PHP 命令执行函数', cwe: 'CWE-78', severity: 'critical', confidence: 'high', languages: ['php'], patterns: [/\b(?:system|exec|shell_exec|passthru|proc_open)\s*\(/], message: '使用 PHP 命令执行函数。' },
+  { id: 'SEC-012', title: 'Ruby 命令执行函数', cwe: 'CWE-78', severity: 'high', confidence: 'high', languages: ['ruby'], patterns: [/\bsystem\s*\(/, /\bexec\s*\(/, /\bIO\.popen\s*\(/], message: '使用 Ruby 命令执行接口。' },
+  { id: 'SEC-013', title: 'Java Runtime.exec / ProcessBuilder', cwe: 'CWE-78', severity: 'high', confidence: 'medium', languages: JAVA, patterns: [/Runtime\.getRuntime\(\)\.exec\s*\(/, /\bnew\s+ProcessBuilder\s*\(/], message: '使用 Java 进程执行接口。' },
+  { id: 'SEC-014', title: 'Python eval / exec', cwe: 'CWE-95', severity: 'critical', confidence: 'high', languages: PY, patterns: [/\beval\s*\(/, /\bexec\s*\(/], message: '使用 Python 动态代码执行。' },
+  { id: 'SEC-015', title: 'tarfile.extractall 路径穿越', cwe: 'CWE-22', severity: 'high', confidence: 'medium', languages: PY, patterns: [/\.extractall\s*\(/], message: '压缩包提取未做成员路径校验。' },
+  { id: 'SEC-016', title: 'JavaScript document.write', cwe: 'CWE-79', severity: 'high', confidence: 'medium', languages: JS, patterns: [/\bdocument\.write\s*\(/], message: '使用 document.write 写入动态内容。' },
+  { id: 'SEC-017', title: 'Python 请求目标来自用户输入', cwe: 'CWE-918', severity: 'high', confidence: 'medium', languages: PY, patterns: [/\brequests\.(?:get|post|request)\s*\([^)]*(?:request|params|form|data|input)/i], message: 'HTTP 请求目标可能来自用户输入。' },
+  { id: 'SEC-305', title: '.env 包含敏感项', cwe: 'CWE-312', severity: 'high', confidence: 'medium', languages: ['env'], patterns: [/^(?:[A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD|PASS)[A-Z0-9_]*)\s*=\s*.+/im], message: '.env 文件中包含敏感配置项。', fileLevel: true },
+  { id: 'SEC-306', title: 'Node crypto.createCipher 已废弃', cwe: 'CWE-327', severity: 'high', confidence: 'high', languages: JS, patterns: [/\bcrypto\.createCipher\s*\(/], message: '使用已废弃的非认证加密接口。' },
+  { id: 'SEC-407', title: 'GitHub Actions 使用浮动分支', cwe: 'CWE-1104', severity: 'low', confidence: 'high', languages: YAML, patterns: [/\buses\s*:\s*\S+@(?:main|master)\b/i], message: 'Action 未锁定到提交 SHA 或版本标签。' },
+  { id: 'SEC-408', title: 'Docker USER root', cwe: 'CWE-250', severity: 'low', confidence: 'high', languages: DOCKER, patterns: [/^\s*USER\s+root\b/im], message: '容器默认以 root 用户运行。' },
+  { id: 'SEC-603', title: 'Python 文件路径来自用户输入', cwe: 'CWE-22', severity: 'high', confidence: 'medium', languages: PY, patterns: [/\bopen\s*\([^)]*(?:request|params|form|input|filename)/i, /\bos\.path\.join\s*\([^)]*(?:request|params|form|input)/i], message: '文件路径可能由用户输入参与。' },
 ]);
+
+/** 规则类别：供报告聚合与排序使用。 */
+export function ruleCategory(ruleId: string): string {
+  const group = ruleId.slice(4, 6)
+  const map: Record<string, string> = {
+    '00': '注入',
+    '01': '反序列化',
+    '02': '加密与密钥',
+    '03': '凭据泄露',
+    '04': '配置与权限',
+    '05': '日志与信息泄露',
+    '06': '路径与网络',
+  }
+  return map[group] ?? '其他'
+}
 
 export function languageForFile(file: string): Language {
   const name = file.toLowerCase()

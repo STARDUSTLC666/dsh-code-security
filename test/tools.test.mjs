@@ -81,3 +81,30 @@ test('secure_policy_set 审批门：允许/拒绝', async () => {
   assert.equal(denied.kind, 'deny')
   await fs.rm(dir, { recursive: true, force: true })
 })
+
+test('secure_diff staged=true 使用 --cached', async () => {
+  const { dir, cfg } = await world({})
+  const calls = []
+  const runner = { async run(argv) { calls.push(argv); return { exitCode: 0, signal: null, stdout: '', stderr: '' } } }
+  const tools = buildSecureTools(cfg, dir, runner)
+  await tools.find(t => t.name === 'secure_diff').execute({ staged: true }, {})
+  assert.ok(calls[0].includes('--cached'))
+  await fs.rm(dir, { recursive: true, force: true })
+})
+
+test('secure_export 生成 SARIF 与 Markdown', async () => {
+  const { dir, cfg } = await world({ 'a.js': 'eval(user)\n' })
+  const tools = buildSecureTools(cfg, dir, fakeRunner)
+  await tools.find(t => t.name === 'secure_scan').execute({ target: '.' }, {})
+  const exportTool = tools.find(t => t.name === 'secure_export')
+  const sarif = await exportTool.execute({ format: 'sarif' }, {})
+  assert.equal(sarif.findingCount, 1)
+  assert.equal(JSON.parse(sarif.text).version, '2.1.0')
+  const markdown = await exportTool.execute({ format: 'markdown' }, {})
+  assert.match(markdown.text, /# 安全审查报告/)
+  const target = path.join(dir, 'report.sarif')
+  const written = await exportTool.execute({ format: 'sarif', path: target }, {})
+  await fs.stat(target)
+  assert.equal(written.path, target)
+  await fs.rm(dir, { recursive: true, force: true })
+})

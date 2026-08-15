@@ -14,7 +14,7 @@ test('manifest 字段', () => {
   assert.ok(existsSync(new URL('../cordis.patch.yml', import.meta.url)))
 })
 
-test('apply 注册 6 个工具并 dispose', () => {
+test('apply 注册 7 个工具并 dispose', () => {
   const names = []
   const listeners = {}
   const ctx = {
@@ -24,7 +24,7 @@ test('apply 注册 6 个工具并 dispose', () => {
     on(e, l) { listeners[e] = l },
   }
   apply(ctx, {})
-  assert.deepEqual(names, ['secure_scan', 'secure_diff', 'secure_fix_verify', 'secure_report', 'secure_policy_show', 'secure_policy_set'])
+  assert.deepEqual(names, ['secure_scan', 'secure_diff', 'secure_fix_verify', 'secure_report', 'secure_export', 'secure_policy_show', 'secure_policy_set'])
   listeners.dispose()
   assert.equal(names.length, 0)
   assert.deepEqual(inject, ['tools', 'subprocess'])
