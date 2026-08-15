@@ -1,0 +1,17 @@
+# dsh-secure-review 组合包补丁：把 AI 代码安全审查插件行插入 profile。
+#
+# 示例（用户 profile 的 cordis.patch.yml）：
+#   - id: secure-review
+#     name: 'dsh-secure-review'
+#     config:
+#       maxFiles: 5000
+#       maxFileBytes: 2097152
+#       failOn: medium
+#       stateDir: .secure-review
+#
+- insert:
+    - id: secure-review
+      name: 'dsh-secure-review'
+      config:
+        maxFiles: 5000
+        failOn: medium

@@ -1,0 +1,62 @@
+{
+  "name": "dsh-secure-review",
+  "version": "0.1.0",
+  "description": "DSH AI 代码安全审查插件：secure_scan/secure_diff/secure_fix_verify/secure_report/secure_policy_show/secure_policy_set 六工具，30+ 确定性规则、密钥熵检测、git diff 审查与修复闭环，零运行时依赖。",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md",
+    "README.en.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepare": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "pnpm run build && node --test \"test/*.test.mjs\"",
+    "prepublishOnly": "pnpm run build"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "plugin",
+    "security",
+    "code-review",
+    "sast",
+    "secrets",
+    "owasp"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.6.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/STARDUSTLC666/dsh-secure-review.git"
+  },
+  "bugs": {
+    "url": "https://github.com/STARDUSTLC666/dsh-secure-review/issues"
+  },
+  "homepage": "https://github.com/STARDUSTLC666/dsh-secure-review#readme",
+  "author": "stardustlc",
+  "packageManager": "pnpm@11.7.0"
+}
