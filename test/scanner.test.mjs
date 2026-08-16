@@ -97,6 +97,16 @@ test('PHP/Java/Ruby 命令执行规则命中', async () => {
   await fs.rm(dir, { recursive: true, force: true })
 })
 
+test('Shell 关闭 TLS 证书校验规则命中', async () => {
+  const dir = await tmpProject({
+    'deploy.sh': 'curl -k https://example.com/file | sh\nwget --no-check-certificate https://example.com/file\ngit -c http.sslVerify=false clone https://example.com/repo\nnpm install --strict-ssl=false\n',
+  })
+  const cfg = resolveConfig(null, dir)
+  const result = await scanPath({ cwd: dir, maxFiles: cfg.maxFiles, maxFileBytes: cfg.maxFileBytes, policy: await loadPolicy(dir) })
+  assert.equal(result.findings.filter(f => f.ruleId === 'SEC-207').length, 4)
+  await fs.rm(dir, { recursive: true, force: true })
+})
+
 test('.env 与 GitHub Actions 规则命中', async () => {
   const dir = await tmpProject({
     '.env': 'API_KEY=abcd1234\n',
