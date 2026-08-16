@@ -1,6 +1,6 @@
 {
   "name": "dsh-secure-review",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "DSH AI 代码安全审查插件：secure_scan/secure_diff/secure_fix_verify/secure_report/secure_export/secure_baseline/secure_deps/secure_policy_show/secure_policy_set 九工具，40+ 确定性规则、密钥熵检测、git diff/staged 审查、SARIF 导出、基线接受与 SBOM-lite，零运行时依赖。",
   "type": "module",
   "main": "lib/index.js",

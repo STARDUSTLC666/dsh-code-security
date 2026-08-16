@@ -30,7 +30,7 @@ const ALL: Language[] = ['any']
 
 export const RULES: readonly SecurityRule[] = Object.freeze([
   { id: 'SEC-001', title: 'JavaScript eval / Function 动态执行', cwe: 'CWE-95', severity: 'critical', confidence: 'high', languages: JS, patterns: [/\beval\s*\(/, /\bnew\s+Function\s*\(/], message: '发现 eval 或 new Function 动态代码执行。' },
-  { id: 'SEC-002', title: 'Node.js exec 使用 shell 执行命令', cwe: 'CWE-78', severity: 'high', confidence: 'high', languages: JS, patterns: [/\bexec(?:Sync)?\s*\(/], message: 'exec/execSync 经 shell 解释命令字符串。' },
+  { id: 'SEC-002', title: 'Node.js exec 使用 shell 执行命令', cwe: 'CWE-78', severity: 'high', confidence: 'high', languages: JS, patterns: [/\bexecSync\s*\(/, /child_process\s*\.\s*exec(?:Sync)?\s*\(/], message: 'child_process exec/execSync 经 shell 解释命令字符串。' },
   { id: 'SEC-003', title: 'Node.js spawn shell: true', cwe: 'CWE-78', severity: 'high', confidence: 'high', languages: JS, patterns: [/\bspawn(?:Sync)?\s*\([^)]*\{\s*shell\s*:\s*true/], message: 'spawn 显式启用了 shell 解释。' },
   { id: 'SEC-004', title: 'Python subprocess shell=True', cwe: 'CWE-78', severity: 'critical', confidence: 'high', languages: PY, patterns: [/\bsubprocess\.(?:run|call|Popen|check_output|check_call)\s*\([^)]*shell\s*=\s*True/], message: 'subprocess 调用启用 shell=True。' },
   { id: 'SEC-005', title: 'Python os.system / popen', cwe: 'CWE-78', severity: 'high', confidence: 'high', languages: PY, patterns: [/\bos\.(?:system|popen)\s*\(/], message: '使用 os.system/os.popen 执行 shell 命令。' },

@@ -19,7 +19,7 @@ async function tmpProject(files) {
 
 test('JavaScript 注入/硬编码密钥规则命中', async () => {
   const dir = await tmpProject({
-    'bad.js': 'eval(userInput);\nexec("rm -rf " + x);\nconst password = "hunter2";\ndocument.body.innerHTML = user;\n',
+    'bad.js': 'eval(userInput);\nexecSync("rm -rf " + x);\nconst password = "hunter2";\ndocument.body.innerHTML = user;\n',
   })
   const cfg = resolveConfig(null, dir)
   const result = await scanPath({ cwd: dir, maxFiles: cfg.maxFiles, maxFileBytes: cfg.maxFileBytes, policy: await loadPolicy(dir) })
