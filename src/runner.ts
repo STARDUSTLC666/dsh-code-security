@@ -1,7 +1,7 @@
 /**
  * 子进程执行层：通过 DSH 官方 subprocess 服务运行 git diff。
  *
- * @module dsh-secure-review/runner
+ * @module dsh-code-security/runner
  */
 
 export interface RunResult {

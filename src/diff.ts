@@ -1,7 +1,7 @@
 /**
  * git diff 增量扫描：只解析 unified diff 的新增行并映射到新文件行号。
  *
- * @module dsh-secure-review/diff
+ * @module dsh-code-security/diff
  */
 
 import path from 'node:path'

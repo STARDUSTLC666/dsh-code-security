@@ -1,7 +1,7 @@
 /**
  * 确定性安全扫描器：遍历文件、按语言应用规则、密钥熵检测、内联豁免。
  *
- * @module dsh-secure-review/scanner
+ * @module dsh-code-security/scanner
  */
 
 import fs from 'node:fs/promises'

@@ -1,7 +1,7 @@
 /**
  * 确定性安全规则库。每条规则只报告事实模式，不包含修复建议。
  *
- * @module dsh-secure-review/rules
+ * @module dsh-code-security/rules
  */
 
 import type { Severity } from './config.js'

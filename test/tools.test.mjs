@@ -12,7 +12,7 @@ async function world(files = {}) {
     await fs.mkdir(path.dirname(file), { recursive: true })
     await fs.writeFile(file, content)
   }
-  const cfg = resolveConfig({ stateDir: path.join(dir, '.secure-review') }, dir)
+  const cfg = resolveConfig({ stateDir: path.join(dir, '.code-security') }, dir)
   return { dir, cfg }
 }
 
@@ -28,7 +28,7 @@ test('secure_scan 写入状态并给出门禁结论', async () => {
   const value = await tools.find(t => t.name === 'secure_scan').execute({ target: '.' }, {})
   assert.equal(value.counts.critical, 1)
   assert.equal(value.passed, false)
-  await fs.stat(path.join(dir, '.secure-review/state.json'))
+  await fs.stat(path.join(dir, '.code-security/state.json'))
   await fs.rm(dir, { recursive: true, force: true })
 })
 

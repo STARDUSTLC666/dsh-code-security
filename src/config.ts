@@ -1,7 +1,7 @@
 /**
- * dsh-secure-review 配置解析：扫描边界、门禁阈值与状态目录。
+ * dsh-code-security 配置解析：扫描边界、门禁阈值与状态目录。
  *
- * @module dsh-secure-review/config
+ * @module dsh-code-security/config
  */
 
 import path from 'node:path'
@@ -22,7 +22,7 @@ export interface ResolvedSecureConfig {
   stateDir: string
 }
 
-export const DEFAULT_EXCLUDE_DIRS = ['node_modules', '.git', 'dist', 'build', 'out', 'coverage', '.next', '.cache', '.turbo', '.secure-review']
+export const DEFAULT_EXCLUDE_DIRS = ['node_modules', '.git', 'dist', 'build', 'out', 'coverage', '.next', '.cache', '.turbo', '.code-security']
 
 export function resolveConfig(config: SecureConfig | undefined | null, cwd = process.cwd()): ResolvedSecureConfig {
   const cfg = config ?? {}
@@ -37,7 +37,7 @@ export function resolveConfig(config: SecureConfig | undefined | null, cwd = pro
     maxFileBytes = Math.min(20 * 1024 * 1024, Math.max(64 * 1024, Math.round(cfg.maxFileBytes)))
   }
   const failOn: Severity = cfg.failOn === 'critical' || cfg.failOn === 'high' || cfg.failOn === 'medium' || cfg.failOn === 'low' ? cfg.failOn : 'medium'
-  const stateDir = typeof cfg.stateDir === 'string' && cfg.stateDir.trim() !== '' ? path.resolve(cwd, cfg.stateDir.trim()) : path.join(cwd, '.secure-review')
+  const stateDir = typeof cfg.stateDir === 'string' && cfg.stateDir.trim() !== '' ? path.resolve(cwd, cfg.stateDir.trim()) : path.join(cwd, '.code-security')
   return { maxFiles, maxFileBytes, failOn, stateDir }
 }
 

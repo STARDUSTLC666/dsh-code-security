@@ -1,4 +1,4 @@
 node_modules/
 lib/
 *.tgz
-.secure-review/
+.code-security/

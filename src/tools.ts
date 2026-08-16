@@ -3,7 +3,7 @@
  * secure_scan / secure_diff / secure_fix_verify / secure_report / secure_export /
  * secure_baseline / secure_deps / secure_policy_show / secure_policy_set。
  *
- * @module dsh-secure-review/tools
+ * @module dsh-code-security/tools
  */
 
 import { writeFile } from 'node:fs/promises'
@@ -111,7 +111,7 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
 
   const secureScan: SecureToolDefinition = {
     name: 'secure_scan',
-    description: '扫描工作区（或指定文件/目录），用确定性规则检测注入、弱加密、硬编码密钥、危险配置等问题。结果写入 .secure-review 状态供 secure_fix_verify 对比。',
+    description: '扫描工作区（或指定文件/目录），用确定性规则检测注入、弱加密、硬编码密钥、危险配置等问题。结果写入 .code-security 状态供 secure_fix_verify 对比。',
     parameters: compileParameters({
       target: { type: 'string', description: '要扫描的文件或目录（可选，缺省扫描整个工作区）。' },
     }),
@@ -279,7 +279,7 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
 
   const policyShow: SecureToolDefinition = {
     name: 'secure_policy_show',
-    description: '查看当前项目的 .secure-review.json 策略：排除目录、忽略规则与门禁阈值。',
+    description: '查看当前项目的 .code-security.json 策略：排除目录、忽略规则与门禁阈值。',
     parameters: compileParameters({}),
     output: {
       schema: { type: 'object', properties: { file: { type: 'string' }, policy: { type: 'object', additionalProperties: true } }, additionalProperties: true },
@@ -297,7 +297,7 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
 
   const policySet: SecureToolDefinition = {
     name: 'secure_policy_set',
-    description: '写入新的 .secure-review.json 策略（JSON 文本）。会整体替换当前策略，写操作默认需要审批。',
+    description: '写入新的 .code-security.json 策略（JSON 文本）。会整体替换当前策略，写操作默认需要审批。',
     parameters: compileParameters({
       policy: { type: 'string', required: true, description: '完整策略 JSON 文本（必填）。' },
     }),
@@ -327,8 +327,8 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
   policySet.gate = async (exec: unknown, next: () => Promise<unknown>) => {
     const record = (typeof exec === 'object' && exec !== null ? exec : {}) as Record<string, unknown>
     const approval = record.approval as { request(options: { reason: string }): Promise<string> } | undefined
-    if (approval === undefined) return { kind: 'deny', reason: 'secure_policy_set 需要确认，但当前环境没有审批通道。如确需直接写入，请在受控终端手动编辑 .secure-review.json。' }
-    const outcome = await approval.request({ reason: '覆盖写入项目 .secure-review.json 安全策略' })
+    if (approval === undefined) return { kind: 'deny', reason: 'secure_policy_set 需要确认，但当前环境没有审批通道。如确需直接写入，请在受控终端手动编辑 .code-security.json。' }
+    const outcome = await approval.request({ reason: '覆盖写入项目 .code-security.json 安全策略' })
     if (outcome === 'allowed-once') return next()
     if (outcome === 'cancelled') return { kind: 'deny', reason: '策略写入被取消，未执行。' }
     return { kind: 'deny', reason: '策略写入未获批准。' }
@@ -405,7 +405,7 @@ function buildSarif(findings: Finding[], target: string): string {
     version: '2.1.0',
     $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
     runs: [{
-      tool: { driver: { name: 'dsh-secure-review', version: '0.1.0', informationUri: 'https://github.com/STARDUSTLC666/dsh-secure-review', rules: [...rules.values()] } },
+      tool: { driver: { name: 'dsh-code-security', version: '0.1.0', informationUri: 'https://github.com/STARDUSTLC666/dsh-code-security', rules: [...rules.values()] } },
       originalUriBaseIds: { ROOTPATH: { uri: 'file:///' + target.replace(/\\/g, '/') } },
       results,
     }],

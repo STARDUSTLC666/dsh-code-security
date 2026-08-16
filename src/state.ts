@@ -2,7 +2,7 @@
  * 扫描状态持久化：供 secure_fix_verify 对比基线，secure_report 汇总历史，
  * 以及 secure_baseline 持久化已接受的基线问题。
  *
- * @module dsh-secure-review/state
+ * @module dsh-code-security/state
  */
 
 import fs from 'node:fs/promises'

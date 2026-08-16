@@ -12,7 +12,7 @@ async function world(files = {}) {
     await fs.mkdir(path.dirname(file), { recursive: true })
     await fs.writeFile(file, content)
   }
-  const cfg = resolveConfig({ stateDir: path.join(dir, '.secure-review') }, dir)
+  const cfg = resolveConfig({ stateDir: path.join(dir, '.code-security') }, dir)
   return { dir, cfg }
 }
 

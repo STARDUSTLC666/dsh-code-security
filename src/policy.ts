@@ -1,7 +1,7 @@
 /**
- * 项目策略文件 .secure-review.json：排除目录、忽略规则与门禁阈值。
+ * 项目策略文件 .code-security.json：排除目录、忽略规则与门禁阈值。
  *
- * @module dsh-secure-review/policy
+ * @module dsh-code-security/policy
  */
 
 import fs from 'node:fs/promises'
@@ -26,7 +26,7 @@ export const DEFAULT_POLICY: SecurePolicy = Object.freeze({
   ignore: [],
 })
 
-export const POLICY_FILE = '.secure-review.json'
+export const POLICY_FILE = '.code-security.json'
 
 export function policyPath(cwd: string): string {
   return path.join(cwd, POLICY_FILE)

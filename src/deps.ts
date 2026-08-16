@@ -2,7 +2,7 @@
  * SBOM-lite：解析常见依赖清单，输出依赖名称、版本约束与风险标记。
  * 只做确定性解析，不联网、不执行包管理器。
  *
- * @module dsh-secure-review/deps
+ * @module dsh-code-security/deps
  */
 
 import fs from 'node:fs/promises'

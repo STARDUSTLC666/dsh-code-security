@@ -1,5 +1,5 @@
 {
-  "name": "dsh-secure-review",
+  "name": "dsh-code-security",
   "version": "0.2.2",
   "description": "DSH AI 代码安全审查插件：secure_scan/secure_diff/secure_fix_verify/secure_report/secure_export/secure_baseline/secure_deps/secure_policy_show/secure_policy_set 九工具，40+ 确定性规则、密钥熵检测、git diff/staged 审查、SARIF 导出、基线接受与 SBOM-lite，零运行时依赖。",
   "type": "module",
@@ -51,12 +51,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/STARDUSTLC666/dsh-secure-review.git"
+    "url": "git+https://github.com/STARDUSTLC666/dsh-code-security.git"
   },
   "bugs": {
-    "url": "https://github.com/STARDUSTLC666/dsh-secure-review/issues"
+    "url": "https://github.com/STARDUSTLC666/dsh-code-security/issues"
   },
-  "homepage": "https://github.com/STARDUSTLC666/dsh-secure-review#readme",
+  "homepage": "https://github.com/STARDUSTLC666/dsh-code-security#readme",
   "author": "stardustlc",
   "packageManager": "pnpm@11.7.0"
 }
