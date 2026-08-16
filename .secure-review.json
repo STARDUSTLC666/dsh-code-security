@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "exclude": [],
+  "ignore": [
+    {
+      "ruleId": "SEC-001",
+      "file": "test/**",
+      "reason": "安全扫描器自身的故意漏洞样例"
+    },
+    {
+      "ruleId": "SEC-301",
+      "file": "test/**",
+      "reason": "安全扫描器自身的故意漏洞样例"
+    },
+    {
+      "ruleId": "SEC-501",
+      "file": "test/**",
+      "reason": "安全扫描器自身的故意漏洞样例"
+    }
+  ],
+  "failOn": "high"
+}
