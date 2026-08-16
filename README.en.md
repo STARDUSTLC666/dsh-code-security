@@ -18,7 +18,7 @@ A DeepSeek Harness plugin for AI code security review: deterministic rule engine
 | `secure_policy_show` | Show .code-security.json | no |
 | `secure_policy_set` | Replace policy JSON | approval |
 
-40+ deterministic rules: injection, deserialization, weak crypto, secrets, dangerous config, sensitive logging, path traversal, SSRF.
+40+ deterministic rules: injection, deserialization, weak crypto (including shell TLS bypass flags), secrets, dangerous config, sensitive logging, path traversal, SSRF.
 
 ```bash
 dsh plugin --profile web add dsh-code-security

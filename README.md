@@ -22,7 +22,7 @@ DeepSeek Harness AI 代码安全审查插件：确定性规则引擎 + git diff 
 
 - 注入：eval / exec / shell=True / SQL 拼接 / innerHTML
 - 反序列化：pickle / yaml.load / ObjectInputStream / Marshal / unserialize
-- 加密：弱哈希、ECB、硬编码 IV/密钥、JWT none、TLS 校验关闭
+- 加密：弱哈希、ECB、硬编码 IV/密钥、JWT none、TLS 校验关闭、Shell TLS 绕过（curl -k / wget --no-check-certificate / git sslVerify=false）
 - 凭据：硬编码密码、令牌、私钥、高熵密钥
 - 配置：chmod 777、Docker privileged / latest、npm audit=false、CORS *
 - 泄露：敏感日志、错误堆栈外发、路径穿越、SSRF
@@ -59,7 +59,7 @@ secure_deps { target: . }
 ## 工程
 
 ```bash
-pnpm test       # 构建 + 23 个测试
+pnpm test       # 构建 + 24 个测试
 ```
 
 MIT
