@@ -98,6 +98,7 @@ function detectHighEntropy(line: string, lineNumber: number, file: string, rel: 
   for (const match of line.matchAll(TOKEN_PATTERN)) {
     const token = match[1]!
     if (/^[0-9]+$/.test(token)) continue
+    if (!/\d/.test(token)) continue
     if (shannon(token) < HIGH_ENTROPY_THRESHOLD) continue
     const id = makeId(rule.id, rel, lineNumber, token.slice(0, 32))
     findings.push({
