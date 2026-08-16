@@ -8,13 +8,13 @@ const pkg = require('../package.json')
 
 test('manifest 字段', () => {
   assert.equal(pkg.name, 'dsh-secure-review')
-  assert.equal(pkg.version, '0.1.0')
+  assert.equal(pkg.version, '0.2.0')
   assert.equal(pkg.dsh.bundle.patch, './cordis.patch.yml')
   assert.ok(pkg.files.includes('lib'))
   assert.ok(existsSync(new URL('../cordis.patch.yml', import.meta.url)))
 })
 
-test('apply 注册 7 个工具并 dispose', () => {
+test('apply 注册 9 个工具并 dispose', () => {
   const names = []
   const listeners = {}
   const ctx = {
@@ -24,7 +24,7 @@ test('apply 注册 7 个工具并 dispose', () => {
     on(e, l) { listeners[e] = l },
   }
   apply(ctx, {})
-  assert.deepEqual(names, ['secure_scan', 'secure_diff', 'secure_fix_verify', 'secure_report', 'secure_export', 'secure_policy_show', 'secure_policy_set'])
+  assert.deepEqual(names, ['secure_scan', 'secure_diff', 'secure_fix_verify', 'secure_report', 'secure_export', 'secure_baseline', 'secure_deps', 'secure_policy_show', 'secure_policy_set'])
   listeners.dispose()
   assert.equal(names.length, 0)
   assert.deepEqual(inject, ['tools', 'subprocess'])

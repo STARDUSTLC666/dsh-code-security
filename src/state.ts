@@ -1,5 +1,6 @@
 /**
- * 扫描状态持久化：供 secure_fix_verify 对比基线，secure_report 汇总历史。
+ * 扫描状态持久化：供 secure_fix_verify 对比基线，secure_report 汇总历史，
+ * 以及 secure_baseline 持久化已接受的基线问题。
  *
  * @module dsh-secure-review/state
  */
@@ -19,9 +20,19 @@ export interface ScanStateEntry {
   counts: { critical: number; high: number; medium: number; low: number }
 }
 
+export interface BaselineEntry {
+  time: string
+  target: string
+  reason: string
+  findings: Finding[]
+  fingerprints: string[]
+  counts: { critical: number; high: number; medium: number; low: number }
+}
+
 export interface StateDocument {
   last: ScanStateEntry | null
   history: ScanStateEntry[]
+  baseline: BaselineEntry | null
 }
 
 const STATE_FILE = 'state.json'
@@ -43,14 +54,19 @@ export async function loadState(stateDir: string): Promise<StateDocument> {
     const obj = (parsed ?? {}) as Record<string, unknown>
     const last = isEntry(obj.last) ? obj.last : null
     const history = Array.isArray(obj.history) ? obj.history.filter(isEntry) : []
-    return { last, history }
+    const baseline = isBaseline(obj.baseline) ? obj.baseline : null
+    return { last, history, baseline }
   } catch {
-    return { last: null, history: [] }
+    return { last: null, history: [], baseline: null }
   }
 }
 
 function isEntry(value: unknown): value is ScanStateEntry {
   return typeof value === 'object' && value !== null && Array.isArray((value as ScanStateEntry).findings)
+}
+
+function isBaseline(value: unknown): value is BaselineEntry {
+  return typeof value === 'object' && value !== null && Array.isArray((value as BaselineEntry).findings) && Array.isArray((value as BaselineEntry).fingerprints)
 }
 
 export async function saveState(stateDir: string, entry: ScanStateEntry): Promise<string> {
@@ -59,6 +75,17 @@ export async function saveState(stateDir: string, entry: ScanStateEntry): Promis
   state.last = entry
   state.history.unshift(entry)
   state.history = state.history.slice(0, HISTORY_LIMIT)
+  return writeState(stateDir, state)
+}
+
+export async function saveBaseline(stateDir: string, baseline: BaselineEntry): Promise<string> {
+  await fs.mkdir(stateDir, { recursive: true })
+  const state = await loadState(stateDir)
+  state.baseline = baseline
+  return writeState(stateDir, state)
+}
+
+async function writeState(stateDir: string, state: StateDocument): Promise<string> {
   const file = statePath(stateDir)
   const tmp = file + '.tmp-' + process.pid
   await fs.writeFile(tmp, JSON.stringify(state, null, 2), 'utf8')
@@ -80,4 +107,17 @@ export function compareFingerprints(baseline: string[], current: string[]): { cl
     remaining: baseline.filter((x) => newSet.has(x)),
     fresh: current.filter((x) => !oldSet.has(x)),
   }
+}
+
+/** 根据已接受基线把发现分为新增与已接受。 */
+export function splitByBaseline(findings: Finding[], baseline: BaselineEntry | null): { fresh: Finding[]; accepted: Finding[] } {
+  if (baseline === null) return { fresh: findings, accepted: [] }
+  const acceptedSet = new Set(baseline.fingerprints)
+  const fresh: Finding[] = []
+  const accepted: Finding[] = []
+  for (const finding of findings) {
+    if (acceptedSet.has(findingFingerprint(finding))) accepted.push(finding)
+    else fresh.push(finding)
+  }
+  return { fresh, accepted }
 }

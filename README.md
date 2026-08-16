@@ -13,6 +13,8 @@ DeepSeek Harness AI 代码安全审查插件：确定性规则引擎 + git diff 
 | `secure_fix_verify` | 修复后复扫：关闭 / 仍存在 / 新引入 | 写状态 |
 | `secure_report` | 按规则/文件聚合 + 门禁结论 | 否 |
 | `secure_export` | 导出 SARIF 2.1.0 / Markdown 报告 | 写文件审批 |
+| `secure_baseline` | 接受当前已知问题为基线，之后只按新增判定 | 审批门 |
+| `secure_deps` | SBOM-lite：解析依赖清单与版本约束风险 | 否 |
 | `secure_policy_show` | 查看 .secure-review.json 策略 | 否 |
 | `secure_policy_set` | 写入策略（排除/忽略/阈值） | 审批门 |
 
@@ -39,6 +41,8 @@ dsh plugin --profile web add dsh-secure-review
 secure_scan { target: src }
 secure_diff { base: HEAD }
 secure_fix_verify { target: src }
+secure_baseline { reason: 历史遗留 }
+secure_deps { target: . }
 ```
 
 策略示例（`.secure-review.json`）：
@@ -55,7 +59,7 @@ secure_fix_verify { target: src }
 ## 工程
 
 ```bash
-pnpm test       # 构建 + 19 个测试
+pnpm test       # 构建 + 23 个测试
 ```
 
 MIT

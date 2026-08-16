@@ -49,10 +49,12 @@ export function apply(ctx: SecurePluginContext, config?: SecureConfig | null): v
 }
 
 export * from './config.js'
+export * from './deps.js'
 export * from './diff.js'
 export * from './policy.js'
 export * from './rules.js'
 export * from './runner.js'
 export * from './scanner.js'
 export * from './state.js'
+export * from './extra.js'
 export * from './tools.js'

@@ -1,7 +1,7 @@
 /**
- * 七个面向模型的安全审查工具：
+ * 九个面向模型的安全审查工具：
  * secure_scan / secure_diff / secure_fix_verify / secure_report / secure_export /
- * secure_policy_show / secure_policy_set。
+ * secure_baseline / secure_deps / secure_policy_show / secure_policy_set。
  *
  * @module dsh-secure-review/tools
  */
@@ -9,12 +9,14 @@
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { optionalString, requiredString, type ResolvedSecureConfig, type Severity } from './config.js'
+import { scanDeps } from './deps.js'
+import { buildExtraTools } from './extra.js'
 import { runGitDiff, scanDiff } from './diff.js'
 import { loadPolicy, normalizePolicy, POLICY_FILE, savePolicy, type SecurePolicy } from './policy.js'
 import { ruleCategory } from './rules.js'
 import type { ProcessRunner } from './runner.js'
 import { scanPath, type Finding } from './scanner.js'
-import { compareFingerprints, countFindings, findingFingerprint, loadState, saveState } from './state.js'
+import { compareFingerprints, countFindings, findingFingerprint, loadState, saveBaseline, saveState, splitByBaseline } from './state.js'
 
 export interface ContentBlock {
   type: 'text'
@@ -69,6 +71,9 @@ const scanSchema = {
     root: { type: 'string' }, filesScanned: { type: 'integer' }, filesSkipped: { type: 'integer' },
     findings: { type: 'array', items: findingSchema }, counts: countsSchema, passed: { type: 'boolean' },
     failOn: { type: 'string' }, durationMs: { type: 'integer' },
+    newFindings: { type: 'array', items: findingSchema }, newCounts: countsSchema,
+    acceptedFindings: { type: 'array', items: findingSchema },
+    baseline: { type: 'object', additionalProperties: true },
   },
   additionalProperties: true,
 }
@@ -78,13 +83,22 @@ function verdictOf(findings: Finding[], failOn: Severity): boolean {
   return !findings.some((finding) => SEVERITY_ORDER[finding.severity] >= threshold)
 }
 
+function baselineSummary(value: unknown): { fresh: Finding[]; accepted: Finding[] } {
+  const rec = (value ?? {}) as Record<string, unknown>
+  return {
+    fresh: Array.isArray(rec.newFindings) ? rec.newFindings as Finding[] : [],
+    accepted: Array.isArray(rec.acceptedFindings) ? rec.acceptedFindings as Finding[] : [],
+  }
+}
+
 function renderFindings(value: unknown): ContentBlock[] {
   const rec = (value ?? {}) as Record<string, unknown>
   const findings = Array.isArray(rec.findings) ? rec.findings as Finding[] : []
   const counts = rec.counts as Record<string, unknown> | undefined
+  const split = baselineSummary(value)
   const lines = [
     '安全审查：' + (rec.passed === true ? '通过' : '未通过'),
-    '文件 ' + String(rec.filesScanned ?? 0) + ' 个，发现 ' + findings.length + ' 个问题（critical ' + String(counts?.critical ?? 0) + ' / high ' + String(counts?.high ?? 0) + ' / medium ' + String(counts?.medium ?? 0) + ' / low ' + String(counts?.low ?? 0) + '）。',
+    '文件 ' + String(rec.filesScanned ?? 0) + ' 个，发现 ' + findings.length + ' 个问题（critical ' + String(counts?.critical ?? 0) + ' / high ' + String(counts?.high ?? 0) + ' / medium ' + String(counts?.medium ?? 0) + ' / low ' + String(counts?.low ?? 0) + '）；基线外新增 ' + split.fresh.length + ' 个。',
   ]
   for (const finding of findings) {
     lines.push('- ' + finding.file + ':' + finding.line + ' [' + finding.severity + '] ' + finding.ruleId + ' ' + finding.title)
@@ -108,7 +122,9 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
       const policy = await loadPolicy(cwd)
       const failOn = policy.failOn ?? cfg.failOn
       const result = await scanPath({ cwd, target, maxFiles: cfg.maxFiles, maxFileBytes: cfg.maxFileBytes, policy })
+      const state = await loadState(stateDir)
       const counts = countFindings(result.findings)
+      const split = splitByBaseline(result.findings, state.baseline)
       const entry = {
         mode: target === undefined ? 'scan' : 'scan:' + target,
         target: target ?? '.',
@@ -119,7 +135,7 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
         counts,
       }
       const stateFile = await saveState(stateDir, entry)
-      return { ...result, counts, passed: verdictOf(result.findings, failOn), failOn, stateFile }
+      return { ...result, counts, newFindings: split.fresh, newCounts: countFindings(split.fresh), acceptedFindings: split.accepted, baseline: state.baseline, passed: verdictOf(split.fresh, failOn), failOn, stateFile }
     },
     timeoutMs: 120000,
   }
@@ -141,7 +157,9 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
       const failOn = policy.failOn ?? cfg.failOn
       const diff = await runGitDiff(runner, cwd, base, target, 30000, args.staged === true)
       const result = scanDiff(diff, cwd, policy)
+      const state = await loadState(stateDir)
       const counts = countFindings(result.findings)
+      const split = splitByBaseline(result.findings, state.baseline)
       const entry = {
         mode: 'diff:' + base,
         target: target ?? '.',
@@ -152,7 +170,7 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
         counts,
       }
       await saveState(stateDir, entry)
-      return { root: base, filesScanned: result.filesChanged, filesSkipped: 0, addedLines: result.addedLines, findings: result.findings, counts, passed: verdictOf(result.findings, failOn), failOn, durationMs: 0 }
+      return { root: base, filesScanned: result.filesChanged, filesSkipped: 0, addedLines: result.addedLines, findings: result.findings, counts, newFindings: split.fresh, newCounts: countFindings(split.fresh), acceptedFindings: split.accepted, baseline: state.baseline, passed: verdictOf(split.fresh, failOn), failOn, durationMs: 0 }
     },
     timeoutMs: 60000,
   }
@@ -241,14 +259,18 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
         byFile.set(finding.file, (byFile.get(finding.file) ?? 0) + 1)
       }
       const failOn = policy.failOn ?? cfg.failOn
+      const split = splitByBaseline(last.findings, state.baseline)
       return {
         hasScan: true,
         stateFile: stateDir,
         policy,
         counts: last.counts,
+        baseline: state.baseline,
+        newCounts: countFindings(split.fresh),
+        acceptedCounts: countFindings(split.accepted),
         byRule: [...byRule.entries()].sort((a, b) => b[1] - a[1]).map(([rule, count]) => ({ rule, count, category: ruleCategory(rule) })),
         byFile: [...byFile.entries()].sort((a, b) => b[1] - a[1]).slice(0, 50).map(([file, count]) => ({ file, count })),
-        passed: verdictOf(last.findings, failOn),
+        passed: verdictOf(split.fresh, failOn),
         historyCount: state.history.length,
       }
     },
@@ -356,7 +378,7 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
     return { kind: 'deny', reason: '导出未获批准。' }
   }
 
-  return [secureScan, secureDiff, secureFixVerify, secureReport, secureExport, policyShow, policySet]
+  return [secureScan, secureDiff, secureFixVerify, secureReport, secureExport, ...buildExtraTools(cfg, cwd), policyShow, policySet]
 }
 
 function buildMarkdown(findings: Finding[], target: string): string {
