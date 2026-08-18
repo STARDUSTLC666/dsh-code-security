@@ -12,6 +12,7 @@ import { resolveConfig, type SecureConfig } from './config.js'
 import { createSubprocessRunner, type SubprocessSpawnLike } from './runner.js'
 import { buildSecureTools, type SecureToolDefinition } from './tools.js'
 
+export const name = 'code-security'
 export const inject = ['tools', 'subprocess']
 
 export interface SecurePluginContext {

@@ -48,7 +48,7 @@ export const RULES: readonly SecurityRule[] = Object.freeze([
 
   { id: 'SEC-201', title: '弱哈希用于安全场景', cwe: 'CWE-328', severity: 'high', confidence: 'medium', languages: ALL, patterns: [/\bcreateHash\s*\(\s*['"]?(?:md5|sha1)['"]?/i, /\bhashlib\.(?:md5|sha1)\s*\(/i, /\b(?:md5|sha1)(?:sum)?\s+/i], message: '使用 MD5 / SHA1 弱哈希。' },
   { id: 'SEC-202', title: 'ECB 分组加密模式', cwe: 'CWE-327', severity: 'high', confidence: 'medium', languages: ALL, patterns: [/aes[-_/]?\d*[-_/]?ecb/i, /['"]AES\/ECB/i], message: '使用 ECB 加密模式。' },
-  { id: 'SEC-203', title: '硬编码 IV / 密钥', cwe: 'CWE-321', severity: 'high', confidence: 'medium', languages: ALL, patterns: [/\.createCipheriv?\s*\([^)]*['"][A-Za-z0-9+/=]{12,}['"]/, /\b(?:iv|key|secret)\s*[:=]\s*['"][A-Za-z0-9+/=]{16,}['"]/i], message: '加密密钥或 IV 以字面量硬编码。' },
+  { id: 'SEC-203', title: '硬编码 IV / 密钥', cwe: 'CWE-321', severity: 'high', confidence: 'medium', languages: ALL, patterns: [/\.createCipher(?:iv)?\s*\([^)]*['"][A-Za-z0-9+/=]{12,}['"]/, /\b(?:iv|key|secret)\s*[:=]\s*['"][A-Za-z0-9+/=]{16,}['"]/i], message: '加密密钥或 IV 以字面量硬编码。' },
   { id: 'SEC-204', title: 'JWT alg none / 不校验签名', cwe: 'CWE-347', severity: 'critical', confidence: 'high', languages: JS, patterns: [/['"]?alg['"]?\s*[:=]\s*['"]?none['"]?/i, /\bjwt\.verify\s*\([^)]*\{\s*algorithms\s*:\s*\[\s*['"]none/i], message: 'JWT 允许 none 算法或未校验签名。' },
   { id: 'SEC-205', title: 'TLS 校验被禁用', cwe: 'CWE-295', severity: 'high', confidence: 'high', languages: ALL, patterns: [/rejectUnauthorized\s*:\s*false/, /\bverify\s*=\s*False/, /InsecureSkipVerify\s*:\s*true/], message: 'TLS 证书校验被显式关闭。' },
   { id: 'SEC-206', title: 'Math.random 用于安全敏感逻辑', cwe: 'CWE-330', severity: 'low', confidence: 'low', languages: JS, patterns: [/\bMath\.random\s*\(/], message: '使用非密码学安全的 Math.random。' },
@@ -88,15 +88,15 @@ export const RULES: readonly SecurityRule[] = Object.freeze([
 
 /** 规则类别：供报告聚合与排序使用。 */
 export function ruleCategory(ruleId: string): string {
-  const group = ruleId.slice(4, 6)
+  const group = ruleId.slice(4, 5)
   const map: Record<string, string> = {
-    '00': '注入',
-    '01': '反序列化',
-    '02': '加密与密钥',
-    '03': '凭据泄露',
-    '04': '配置与权限',
-    '05': '日志与信息泄露',
-    '06': '路径与网络',
+    '0': '注入',
+    '1': '反序列化',
+    '2': '加密与密钥',
+    '3': '凭据泄露',
+    '4': '配置与权限',
+    '5': '日志与信息泄露',
+    '6': '路径与网络',
   }
   return map[group] ?? '其他'
 }

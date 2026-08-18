@@ -67,7 +67,7 @@ function fileHasBinary(buffer: Uint8Array): boolean {
   return false
 }
 
-const TEXT_EXTENSIONS = /\.(?:js|mjs|cjs|jsx|ts|tsx|py|go|java|rb|php|sh|bash|zsh|ya?ml|json|env|dockerfile|txt|md|html|css|vue|svelte)$/i
+const TEXT_EXTENSIONS = /\.(?:js|mjs|cjs|jsx|ts|tsx|py|go|java|rb|php|sh|bash|zsh|ya?ml|json|env|dockerfile|txt|md|html|css|vue|svelte|pem|key|crt|cer|p12|der|p8)$/i
 
 function shouldScanFile(file: string): boolean {
   const base = path.basename(file).toLowerCase()
@@ -137,12 +137,14 @@ export function scanLineSet(entries: LineEntry[], rel: string, policy: SecurePol
     if (isComment(entry.text)) prevDisable.set(entry.line + 1, disabledRules(entry.text, DISABLE_NEXT))
   }
   for (const entry of entries) {
-    const currentDisable = isComment(entry.text) ? disabledRules(entry.text, DISABLE_LINE) : null
+    const isCommentLine = isComment(entry.text)
+    const currentDisable = isCommentLine ? disabledRules(entry.text, DISABLE_LINE) : null
     for (const rule of applied) {
       if (rule.id === 'SEC-304') continue
       if (policyIgnores(policy, rule.id, rel)) continue
       if (shouldSkipLine(rule, currentDisable) || shouldSkipLine(rule, prevDisable.get(entry.line))) continue
       if (rule.fileLevel === true) continue
+      if (isCommentLine) continue
       if (!rule.patterns.some((pattern) => pattern.test(entry.text))) continue
       findings.push({
         id: makeId(rule.id, rel, entry.line, entry.text),
@@ -158,7 +160,7 @@ export function scanLineSet(entries: LineEntry[], rel: string, policy: SecurePol
       })
     }
     const entropyRule = RULES.find((rule) => rule.id === 'SEC-304')
-    if (entropyRule !== undefined && !policyIgnores(policy, entropyRule.id, rel)) {
+    if (entropyRule !== undefined && !policyIgnores(policy, entropyRule.id, rel) && !isCommentLine && !shouldSkipLine(entropyRule, currentDisable) && !shouldSkipLine(entropyRule, prevDisable.get(entry.line))) {
       findings.push(...detectHighEntropy(entry.text, entry.line, rel, rel, entropyRule))
     }
   }
