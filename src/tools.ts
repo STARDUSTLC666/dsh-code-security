@@ -378,7 +378,34 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
     return { kind: 'deny', reason: '导出未获批准。' }
   }
 
-  return [secureScan, secureDiff, secureFixVerify, secureReport, secureExport, ...buildExtraTools(cfg, cwd), policyShow, policySet]
+  const secureHealth: SecureToolDefinition = {
+    name: 'secure_health',
+    description: 'dsh-code-security 自检：汇总扫描配置（文件数/体积上限、严重度门禁、状态目录）并确认工作目录可用。遇到问题时先运行本工具定位。',
+    parameters: compileParameters({}),
+    output: {
+      schema: { type: 'object', additionalProperties: true },
+      render: (_args: unknown, value: unknown): ContentBlock[] => {
+        const rec = (value ?? {}) as Record<string, unknown>
+        const rawChecks = Array.isArray(rec.checks) ? rec.checks : []
+        const lines = ['dsh-code-security 自检' + (rec.ok === true ? '：正常。' : '：发现问题。')]
+        for (const item of rawChecks) {
+          const c = (item ?? {}) as Record<string, unknown>
+          lines.push('- ' + String(c.name) + '：' + (c.ok === true ? '✅ ' + String(c.detail ?? '') : '❌ ' + String(c.detail ?? '')))
+        }
+        return [{ type: 'text', text: lines.join('\n') }]
+      },
+    },
+    async execute(rawArgs: unknown): Promise<unknown> {
+      const checks: Array<Record<string, unknown>> = []
+      checks.push({ name: '扫描上限', ok: true, detail: 'maxFiles=' + cfg.maxFiles + '，maxFileBytes=' + cfg.maxFileBytes })
+      checks.push({ name: '严重度门禁', ok: true, detail: 'failOn=' + cfg.failOn })
+      checks.push({ name: '状态目录', ok: true, detail: cfg.stateDir })
+      checks.push({ name: '工作目录', ok: cwd !== '', detail: cwd })
+      return { ok: true, plugin: 'dsh-code-security', checks }
+    },
+  }
+
+  return [secureScan, secureDiff, secureFixVerify, secureReport, secureExport, ...buildExtraTools(cfg, cwd), policyShow, policySet, secureHealth]
 }
 
 function buildMarkdown(findings: Finding[], target: string): string {
