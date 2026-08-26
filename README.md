@@ -29,11 +29,24 @@ DeepSeek Harness AI 代码安全审查插件：确定性规则引擎 + git diff 
 
 发现只包含客观证据与 CWE 编号，不附修复建议——修复方案由 agent 基于证据生成。
 
+## 兼容性
+
+在 `@deepseek-ai/dsh@0.1.1-rc.2` 上验证（2026-08-26）。遵循 cordis 组合包补丁模型（`cordis.patch.yml` + `dsh.bundle.patch`），运行时不 import 任何 `@deepseek-ai/*` 内部模块。
+
 ## 安装
 
 ```bash
 dsh plugin --profile web add dsh-code-security
 ```
+
+## 卸载
+
+```bash
+dsh plugin --profile web remove dsh-code-security
+```
+
+卸载后重启 Web 服务。如需彻底清理，可再手动删除自己 profile `cordis.patch.yml` 中覆盖的插件行。
+
 
 ## 使用
 
@@ -63,3 +76,6 @@ pnpm test       # 构建 + 24 个测试
 ```
 
 MIT
+## License
+
+MIT（见 [LICENSE](LICENSE)）

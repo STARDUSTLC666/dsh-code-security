@@ -25,3 +25,6 @@ dsh plugin --profile web add dsh-code-security
 ```
 
 MIT
+## License
+
+MIT (see [LICENSE](LICENSE))
