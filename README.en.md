@@ -1,5 +1,7 @@
 # dsh-code-security
 
+![npm](https://img.shields.io/npm/v/dsh-code-security) ![downloads](https://img.shields.io/npm/dm/dsh-code-security) ![license](https://img.shields.io/github/license/STARDUSTLC666/dsh-code-security) ![stars](https://img.shields.io/github/stars/STARDUSTLC666/dsh-code-security?style=social)
+
 > Every agent code change passes a local security scan before delivery.
 
 A DeepSeek Harness plugin for AI code security review: deterministic rule engine, git-diff incremental review, fix-verify loop, and policy gate. Methodology borrows from Codex security skills (evidence-first findings, severity ordering, supply-chain layers). Zero runtime dependencies.

@@ -1,5 +1,7 @@
 # dsh-code-security
 
+![npm](https://img.shields.io/npm/v/dsh-code-security) ![downloads](https://img.shields.io/npm/dm/dsh-code-security) ![license](https://img.shields.io/github/license/STARDUSTLC666/dsh-code-security) ![stars](https://img.shields.io/github/stars/STARDUSTLC666/dsh-code-security?style=social)
+
 > 让 agent 每次改完代码，先过一道本地安全扫描，修复完了才准交付。
 
 DeepSeek Harness AI 代码安全审查插件：确定性规则引擎 + git diff 增量审查 + 修复闭环 + 策略门禁。借鉴 Codex 安全技能的方法论（漏洞分级、证据优先、供应链分层、Agent 安全），实现为可复现工具。零运行时依赖。
