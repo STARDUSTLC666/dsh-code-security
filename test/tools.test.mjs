@@ -70,18 +70,6 @@ test('secure_policy_set 写入策略', async () => {
   await fs.rm(dir, { recursive: true, force: true })
 })
 
-test('secure_policy_set 审批门：允许/拒绝', async () => {
-  const { dir, cfg } = await world({})
-  const tools = buildSecureTools(cfg, dir, fakeRunner)
-  const set = tools.find(t => t.name === 'secure_policy_set')
-  assert.equal(typeof set.gate, 'function')
-  const allowed = await set.gate({ approval: { request: async () => 'allowed-once' } }, async () => 'ok')
-  assert.equal(allowed, 'ok')
-  const denied = await set.gate({ approval: { request: async () => 'cancelled' } }, async () => 'bad')
-  assert.equal(denied.kind, 'deny')
-  await fs.rm(dir, { recursive: true, force: true })
-})
-
 test('secure_diff staged=true 使用 --cached', async () => {
   const { dir, cfg } = await world({})
   const calls = []

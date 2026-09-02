@@ -29,7 +29,6 @@ export interface SecureToolDefinition {
   parameters: { type: 'object'; properties: Record<string, unknown>; required?: string[] }
   output: { schema: Record<string, unknown>; render(args: unknown, value: unknown): ContentBlock[] }
   execute(args: unknown, exec: unknown): Promise<unknown>
-  gate?(exec: unknown, next: () => Promise<unknown>): Promise<unknown>
   timeoutMs?: number
 }
 
@@ -324,16 +323,6 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
     timeoutMs: 10000,
   }
 
-  policySet.gate = async (exec: unknown, next: () => Promise<unknown>) => {
-    const record = (typeof exec === 'object' && exec !== null ? exec : {}) as Record<string, unknown>
-    const approval = record.approval as { request(options: { reason: string }): Promise<string> } | undefined
-    if (approval === undefined) return { kind: 'deny', reason: 'secure_policy_set 需要确认，但当前环境没有审批通道。如确需直接写入，请在受控终端手动编辑 .code-security.json。' }
-    const outcome = await approval.request({ reason: '覆盖写入项目 .code-security.json 安全策略' })
-    if (outcome === 'allowed-once') return next()
-    if (outcome === 'cancelled') return { kind: 'deny', reason: '策略写入被取消，未执行。' }
-    return { kind: 'deny', reason: '策略写入未获批准。' }
-  }
-
   const secureExport: SecureToolDefinition = {
     name: 'secure_export',
     description: '把最近一次扫描结果导出为 SARIF 2.1.0 或 Markdown。path 可选：提供时写入文件（写操作需要审批）。',
@@ -363,19 +352,6 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
       return { format, path: target ?? '', text, findingCount: state.last.findings.length }
     },
     timeoutMs: 30000,
-  }
-
-  secureExport.gate = async (exec: unknown, next: () => Promise<unknown>) => {
-    const record = (typeof exec === 'object' && exec !== null ? exec : {}) as Record<string, unknown>
-    const args = (typeof record.args === 'object' && record.args !== null ? record.args : {}) as Record<string, unknown>
-    const target = typeof args.path === 'string' && args.path !== '' ? args.path : ''
-    if (target === '') return next()
-    const approval = record.approval as { request(options: { reason: string }): Promise<string> } | undefined
-    if (approval === undefined) return { kind: 'deny', reason: 'secure_export 写入文件需要确认，但当前环境没有审批通道。' }
-    const outcome = await approval.request({ reason: '导出安全报告到 ' + target })
-    if (outcome === 'allowed-once') return next()
-    if (outcome === 'cancelled') return { kind: 'deny', reason: '导出被取消，未执行。' }
-    return { kind: 'deny', reason: '导出未获批准。' }
   }
 
   const secureHealth: SecureToolDefinition = {

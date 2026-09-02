@@ -24,7 +24,6 @@ export interface SecureToolDefinition {
         render(args: unknown, value: unknown): ContentBlock[];
     };
     execute(args: unknown, exec: unknown): Promise<unknown>;
-    gate?(exec: unknown, next: () => Promise<unknown>): Promise<unknown>;
     timeoutMs?: number;
 }
 export declare function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner: ProcessRunner): SecureToolDefinition[];

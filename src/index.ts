@@ -17,9 +17,8 @@ export const inject = ['tools', 'subprocess']
 
 export interface SecurePluginContext {
   subprocess: { spawn: SubprocessSpawnLike }
-  tools: { register(definition: SecureToolDefinition, options?: { prepend?: boolean }): () => void }
-  get?(name: 'approval'): unknown
-  on?(event: string, listener: () => void): () => void
+  tools: { register(definition: SecureToolDefinition): () => void }
+  on?(event: string, listener: (...args: any[]) => unknown, options?: { prepend?: boolean }): (() => void) | void
 }
 
 export function apply(ctx: SecurePluginContext, config?: SecureConfig | null): void {
@@ -34,17 +33,18 @@ export function apply(ctx: SecurePluginContext, config?: SecureConfig | null): v
   const tools = buildSecureTools(cfg, process.cwd(), runner)
   const disposers: Array<() => void> = []
   for (const definition of tools) {
-    const wrapped = { ...definition }
-    if (wrapped.gate !== undefined) {
-      const original = wrapped.gate.bind(wrapped)
-      wrapped.gate = async (exec: unknown, next: () => Promise<unknown>) => {
-        const record = (typeof exec === 'object' && exec !== null ? exec : {}) as Record<string, unknown>
-        return original({ ...record, approval: ctx.get?.('approval') }, next)
-      }
-    }
-    disposers.push(ctx.tools.register(wrapped, { prepend: true }))
+    disposers.push(ctx.tools.register(definition))
   }
   if (typeof ctx.on === 'function') {
+    ctx.on('tools/pre-execute', async (exec: { name?: unknown; arguments?: unknown }, next: () => Promise<unknown>) => {
+      const args = (typeof exec.arguments === 'object' && exec.arguments !== null ? exec.arguments : {}) as Record<string, unknown>
+      let reason: string | undefined
+      if (exec.name === 'secure_policy_set') reason = '覆盖写入项目 .code-security.json 安全策略'
+      if (exec.name === 'secure_baseline') reason = '把当前全部安全问题接受为基线'
+      if (exec.name === 'secure_export' && typeof args.path === 'string' && args.path !== '') reason = '导出安全报告到 ' + args.path
+      if (reason === undefined) return next()
+      return { kind: 'ask', reason }
+    }, { prepend: true })
     ctx.on('dispose', () => { for (const dispose of disposers) dispose() })
   }
 }

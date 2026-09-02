@@ -94,15 +94,5 @@ export function buildExtraTools(cfg: ResolvedSecureConfig, cwd: string): SecureT
     timeoutMs: 30000,
   }
 
-  secureBaseline.gate = async (exec: unknown, next: () => Promise<unknown>) => {
-    const record = (typeof exec === 'object' && exec !== null ? exec : {}) as Record<string, unknown>
-    const approval = record.approval as { request(options: { reason: string }): Promise<string> } | undefined
-    if (approval === undefined) return { kind: 'deny', reason: 'secure_baseline 需要确认，但当前环境没有审批通道。' }
-    const outcome = await approval.request({ reason: '把当前全部安全问题接受为基线' })
-    if (outcome === 'allowed-once') return next()
-    if (outcome === 'cancelled') return { kind: 'deny', reason: '基线接受被取消，未执行。' }
-    return { kind: 'deny', reason: '基线接受未获批准。' }
-  }
-
   return [secureBaseline, secureDeps]
 }

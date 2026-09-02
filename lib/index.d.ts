@@ -17,12 +17,11 @@ export interface SecurePluginContext {
         spawn: SubprocessSpawnLike;
     };
     tools: {
-        register(definition: SecureToolDefinition, options?: {
-            prepend?: boolean;
-        }): () => void;
+        register(definition: SecureToolDefinition): () => void;
     };
-    get?(name: 'approval'): unknown;
-    on?(event: string, listener: () => void): () => void;
+    on?(event: string, listener: (...args: any[]) => unknown, options?: {
+        prepend?: boolean;
+    }): (() => void) | void;
 }
 export declare function apply(ctx: SecurePluginContext, config?: SecureConfig | null): void;
 export * from './config.js';

@@ -41,19 +41,6 @@ test('secure_baseline 接受当前问题后，secure_scan 只按新增判定', a
   await fs.rm(dir, { recursive: true, force: true })
 })
 
-test('secure_baseline 审批门允许/拒绝', async () => {
-  const { dir, cfg } = await world({ 'a.js': 'eval(user)\n' })
-  const tools = buildSecureTools(cfg, dir, fakeRunner)
-  await tools.find(t => t.name === 'secure_scan').execute({ target: '.' }, {})
-  const baselineTool = tools.find(t => t.name === 'secure_baseline')
-  assert.equal(typeof baselineTool.gate, 'function')
-  const allowed = await baselineTool.gate({ approval: { request: async () => 'allowed-once' } }, async () => 'ok')
-  assert.equal(allowed, 'ok')
-  const denied = await baselineTool.gate({ approval: { request: async () => 'cancelled' } }, async () => 'bad')
-  assert.equal(denied.kind, 'deny')
-  await fs.rm(dir, { recursive: true, force: true })
-})
-
 test('secure_deps 解析 package.json 并标记风险', async () => {
   const { dir, cfg } = await world({
     'package.json': JSON.stringify({
