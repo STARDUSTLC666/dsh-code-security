@@ -6,6 +6,10 @@
 
 A DeepSeek Harness plugin for AI code security review: deterministic rule engine, git-diff incremental review, fix-verify loop, and policy gate. Methodology borrows from Codex security skills (evidence-first findings, severity ordering, supply-chain layers). Zero runtime dependencies.
 
+## Compatibility
+
+Verified with official `@deepseek-ai/dsh@0.1.5-rc.1` and Node `24.16.0` on 2026-09-11: all 18 components load alongside Modlens, with passing tool-schema, skill-registration and offline read-only invocation checks. Uses the `cordis.patch.yml` + `dsh.bundle.patch` bundle model. Node requirements match this Harness release: 22.19 or later within 22.x, or 24 or later. Live external-service workflows require separate configuration and validation.
+
 ## Tools
 
 | Tool | Purpose | Write |
