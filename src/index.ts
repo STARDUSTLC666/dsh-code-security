@@ -29,7 +29,7 @@ export function apply(ctx: SecurePluginContext, config?: SecureConfig | null): v
     console.warn('[dsh-code-security] ' + (error instanceof Error ? error.message : String(error)))
     cfg = resolveConfig(null)
   }
-  const runner = createSubprocessRunner(ctx.subprocess.spawn, 10000, 60000)
+  const runner = createSubprocessRunner((spec) => ctx.subprocess.spawn(spec), 10000, 60000)
   const tools = buildSecureTools(cfg, process.cwd(), runner)
   const disposers: Array<() => void> = []
   for (const definition of tools) {
