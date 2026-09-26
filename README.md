@@ -1,5 +1,11 @@
 # dsh-code-security
 
+## 0.3.4 更新（2026-09-27）
+
+修复未设置基线时扫描结果被新版 Harness 拒绝的问题。SARIF 正确使用工作区文件 URI、相对路径和规则描述对象，支持空格与中文文件名。
+
+验证宿主：官方源码构建的 Harness 0.1.7-rc.2（保留本地工具调度器修复）。构建与自动测试通过；实际操作和外部服务限制见本轮验收记录。
+
 ![npm](https://img.shields.io/npm/v/dsh-code-security) ![downloads](https://img.shields.io/npm/dm/dsh-code-security) ![license](https://img.shields.io/github/license/STARDUSTLC666/dsh-code-security) ![stars](https://img.shields.io/github/stars/STARDUSTLC666/dsh-code-security?style=social)
 
 > 让 agent 每次改完代码，先过一道本地安全扫描，修复完了才准交付。

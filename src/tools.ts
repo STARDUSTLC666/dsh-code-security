@@ -8,6 +8,7 @@
 
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { optionalString, requiredString, type ResolvedSecureConfig, type Severity } from './config.js'
 import { scanDeps } from './deps.js'
 import { buildExtraTools } from './extra.js'
@@ -72,7 +73,7 @@ const scanSchema = {
     failOn: { type: 'string' }, durationMs: { type: 'integer' },
     newFindings: { type: 'array', items: findingSchema }, newCounts: countsSchema,
     acceptedFindings: { type: 'array', items: findingSchema },
-    baseline: { type: 'object', additionalProperties: true },
+    baseline: { oneOf: [{ type: 'object', additionalProperties: true }, { type: 'null' }] },
   },
   additionalProperties: true,
 }
@@ -347,7 +348,7 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
       const target = optionalString(args, 'path')
       const state = await loadState(stateDir)
       if (state.last === null) throw new Error('尚无扫描结果，请先执行 secure_scan 或 secure_diff。')
-      const text = format === 'sarif' ? buildSarif(state.last.findings, state.last.target) : buildMarkdown(state.last.findings, state.last.target)
+      const text = format === 'sarif' ? buildSarif(state.last.findings, cwd) : buildMarkdown(state.last.findings, state.last.target)
       if (target !== undefined) await writeFile(target, text, 'utf8')
       return { format, path: target ?? '', text, findingCount: state.last.findings.length }
     },
@@ -392,15 +393,15 @@ function buildMarkdown(findings: Finding[], target: string): string {
   return lines.join('\n') + '\n'
 }
 
-function buildSarif(findings: Finding[], target: string): string {
-  const rules = new Map<string, { id: string; name: string; shortDescription: string }>()
+function buildSarif(findings: Finding[], cwd: string): string {
+  const rules = new Map<string, { id: string; name: string; shortDescription: { text: string } }>()
   const results = findings.map((finding, index) => {
-    rules.set(finding.ruleId, { id: finding.ruleId, name: finding.title, shortDescription: finding.title })
+    rules.set(finding.ruleId, { id: finding.ruleId, name: finding.title, shortDescription: { text: finding.title } })
     return {
       ruleId: finding.ruleId,
       level: finding.severity === 'critical' || finding.severity === 'high' ? 'error' : finding.severity === 'medium' ? 'warning' : 'note',
       message: { text: finding.message },
-      locations: [{ physicalLocation: { artifactLocation: { uri: finding.file.replace(/\\/g, '/') }, region: { startLine: finding.line } } }],
+      locations: [{ physicalLocation: { artifactLocation: { uri: finding.file.replace(/\\/g, '/').split('/').map(encodeURIComponent).join('/'), uriBaseId: 'ROOTPATH' }, region: { startLine: finding.line } } }],
       partialFingerprints: { primaryLocationLineHash: finding.id + ':' + String(index) },
     }
   })
@@ -409,7 +410,7 @@ function buildSarif(findings: Finding[], target: string): string {
     $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
     runs: [{
       tool: { driver: { name: 'dsh-code-security', version: '0.1.0', informationUri: 'https://github.com/STARDUSTLC666/dsh-code-security', rules: [...rules.values()] } },
-      originalUriBaseIds: { ROOTPATH: { uri: 'file:///' + target.replace(/\\/g, '/') } },
+      originalUriBaseIds: { ROOTPATH: { uri: pathToFileURL(path.resolve(cwd) + path.sep).href } },
       results,
     }],
   }, null, 2)

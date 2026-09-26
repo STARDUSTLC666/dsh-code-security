@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { buildSecureTools, resolveConfig } from '../lib/index.js'
 
 async function world(files = {}) {
@@ -95,4 +96,18 @@ test('secure_export 生成 SARIF 与 Markdown', async () => {
   await fs.stat(target)
   assert.equal(written.path, target)
   await fs.rm(dir, { recursive: true, force: true })
+})
+
+test('SARIF resolves a nested finding against the workspace with encoded paths', async (t) => {
+  const { dir, cfg } = await world({ 'src space/a#中.js': 'eval(user)\n' })
+  t.after(() => fs.rm(dir, { recursive: true, force: true }))
+  const tools = buildSecureTools(cfg, dir, fakeRunner)
+  await tools.find(t => t.name === 'secure_scan').execute({ target: 'src space/a#中.js' }, {})
+  const exported = await tools.find(t => t.name === 'secure_export').execute({ format: 'sarif' }, {})
+  const run = JSON.parse(exported.text).runs[0]
+  const location = run.results[0].locations[0].physicalLocation.artifactLocation
+  assert.equal(location.uriBaseId, 'ROOTPATH')
+  const base = run.originalUriBaseIds.ROOTPATH.uri
+  assert.equal(new URL(location.uri, base).href, pathToFileURL(path.join(dir, 'src space/a#中.js')).href)
+  assert.deepEqual(run.tool.driver.rules[0].shortDescription, { text: run.tool.driver.rules[0].name })
 })

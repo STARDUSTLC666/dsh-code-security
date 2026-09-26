@@ -1,5 +1,11 @@
 # dsh-code-security
 
+## 0.3.4 update (2026-09-27)
+
+Fixes scan output validation when no baseline exists. SARIF now uses workspace file URIs, relative locations and structured rule descriptions, including paths with spaces and Unicode.
+
+Validation host: Harness 0.1.7-rc.2 built from official sources, retaining the local tool-scheduler fix. Build and automated checks pass; interactive coverage and external-service limits are recorded in this release round.
+
 ![npm](https://img.shields.io/npm/v/dsh-code-security) ![downloads](https://img.shields.io/npm/dm/dsh-code-security) ![license](https://img.shields.io/github/license/STARDUSTLC666/dsh-code-security) ![stars](https://img.shields.io/github/stars/STARDUSTLC666/dsh-code-security?style=social)
 
 > Every agent code change passes a local security scan before delivery.
