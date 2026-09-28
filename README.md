@@ -4,7 +4,7 @@
 
 扫描参数写错时明确报错，避免把 `paths`、`files` 或空目标误当成扫描整个工作区。修复标准模式中结果卡片误显示“0 个文件、未通过”的问题；文件数量、结论与问题列表现在使用实际扫描结果。
 
-验证宿主：官方源码构建的 Harness 0.2.0-rc.1（保留本地工具调度器修复）。31 项插件测试通过；18 插件共同加载检查通过，宿主实际执行 `secure_scan` 并校验文件数量、通过状态和模型可见正文。
+验证宿主：官方源码构建的 Harness `0.2.0-rc.1`（commit `407e65c8`）+ Node `24.16.0`（2026-09-28）。31 项插件测试在隔离环境全部通过；同一个宿主里 18 个插件共同加载，注册 10 个工具，工具 schema 与健康检查契约通过。本轮未启用真实端口与外部服务。
 
 ![npm](https://img.shields.io/npm/v/dsh-code-security) ![downloads](https://img.shields.io/npm/dm/dsh-code-security) ![license](https://img.shields.io/github/license/STARDUSTLC666/dsh-code-security) ![stars](https://img.shields.io/github/stars/STARDUSTLC666/dsh-code-security?style=social)
 

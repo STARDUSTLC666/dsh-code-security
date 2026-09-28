@@ -4,7 +4,7 @@
 
 Rejects unknown scan arguments and empty targets before scanning or replacing state, preventing misspelled scopes from expanding to the whole workspace. Fixes standard-mode output incorrectly displaying zero files and a failed verdict: counts, verdicts and findings now come from the actual scan result.
 
-Validation host: Harness 0.2.0-rc.1 built from official sources, retaining the local tool-scheduler fix. All 31 plugin tests and the shared 18-plugin host checks pass. The host executes `secure_scan` and checks its file count, verdict and model-visible text.
+Validation host: Harness `0.2.0-rc.1` built from official sources (commit `407e65c8`) with Node `24.16.0` on 2026-09-28. All 31 plugin tests pass in an isolated environment; all 18 plugins mount together in one host registering 10 tools, with tool schemas and health-check contracts passing. No live ports or external services were exercised in this round.
 
 ![npm](https://img.shields.io/npm/v/dsh-code-security) ![downloads](https://img.shields.io/npm/dm/dsh-code-security) ![license](https://img.shields.io/github/license/STARDUSTLC666/dsh-code-security) ![stars](https://img.shields.io/github/stars/STARDUSTLC666/dsh-code-security?style=social)
 
