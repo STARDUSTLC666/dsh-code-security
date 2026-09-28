@@ -1,6 +1,6 @@
 # dsh-code-security
 
-## 0.3.5 update (2026-09-28)
+## 0.3.6 update (2026-09-28)
 
 Rejects unknown scan arguments and empty targets before scanning or replacing state, preventing misspelled scopes from expanding to the whole workspace. Fixes standard-mode output incorrectly displaying zero files and a failed verdict: counts, verdicts and findings now come from the actual scan result.
 
@@ -14,9 +14,7 @@ A DeepSeek Harness plugin for AI code security review: deterministic rule engine
 
 ## Compatibility
 
-Verified with official `@deepseek-ai/dsh@0.1.5-rc.1` and Node `24.16.0` on 2026-09-11: all 18 components load alongside Modlens, with passing tool-schema, skill-registration and offline read-only invocation checks. Uses the `cordis.patch.yml` + `dsh.bundle.patch` bundle model. Node requirements match this Harness release: 22.19 or later within 22.x, or 24 or later. Live external-service workflows require separate configuration and validation.
-
-2026-09-13 fix: retain the service receiver when calling `subprocess.spawn`, preventing failures caused by passing the method as an unbound callback. Verified with official `0.1.5-rc.1` and `0.1.5-rc.2` on Node `24.16.0`. `secure_diff` reads a real isolated Git repository through the host subprocess service and reports the changed file and added line.
+2026-09-13 fix: retain the service receiver when calling `subprocess.spawn`, preventing failures caused by passing the method as an unbound callback. Verified against a real isolated host subprocess service. `secure_diff` reads a real isolated Git repository through the host subprocess service and reports the changed file and added line.
 
 ## Tools
 
