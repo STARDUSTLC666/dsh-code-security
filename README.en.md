@@ -1,10 +1,10 @@
 # dsh-code-security
 
-## 0.3.4 update (2026-09-27)
+## 0.3.5 update (2026-09-28)
 
-Fixes scan output validation when no baseline exists. SARIF now uses workspace file URIs, relative locations and structured rule descriptions, including paths with spaces and Unicode.
+Rejects unknown scan arguments and empty targets before scanning or replacing state, preventing misspelled scopes from expanding to the whole workspace. Fixes standard-mode output incorrectly displaying zero files and a failed verdict: counts, verdicts and findings now come from the actual scan result.
 
-Validation host: Harness 0.1.7-rc.2 built from official sources, retaining the local tool-scheduler fix. Build and automated checks pass; interactive coverage and external-service limits are recorded in this release round.
+Validation host: Harness 0.2.0-rc.1 built from official sources, retaining the local tool-scheduler fix. All 31 plugin tests and the shared 18-plugin host checks pass. The host executes `secure_scan` and checks its file count, verdict and model-visible text.
 
 ![npm](https://img.shields.io/npm/v/dsh-code-security) ![downloads](https://img.shields.io/npm/dm/dsh-code-security) ![license](https://img.shields.io/github/license/STARDUSTLC666/dsh-code-security) ![stars](https://img.shields.io/github/stars/STARDUSTLC666/dsh-code-security?style=social)
 

@@ -1,6 +1,6 @@
 {
   "name": "dsh-code-security",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "DSH 代码安全审查插件：40+ 确定性规则与密钥熵检测，支持 git diff/staged 审查、SARIF 导出、基线接受与 SBOM-lite。",
   "type": "module",
   "main": "lib/index.js",

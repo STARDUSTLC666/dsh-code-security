@@ -27,7 +27,7 @@ export interface ContentBlock {
 export interface SecureToolDefinition {
   name: string
   description: string
-  parameters: { type: 'object'; properties: Record<string, unknown>; required?: string[] }
+  parameters: { type: 'object'; properties: Record<string, unknown>; required?: string[]; additionalProperties?: boolean }
   output: { schema: Record<string, unknown>; render(args: unknown, value: unknown): ContentBlock[] }
   execute(args: unknown, exec: unknown): Promise<unknown>
   timeoutMs?: number
@@ -47,6 +47,22 @@ function compileParameters(spec: Record<string, any>): { type: 'object'; propert
     properties[key] = node
   }
   return { type: 'object', properties, ...(required.length > 0 ? { required } : {}) }
+}
+
+/** Reject ambiguous scopes before reading files, running git, or replacing scan state. */
+function scanArguments(raw: unknown, allowed: readonly string[] = ['target']): Record<string, unknown> {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error('扫描参数必须是对象。请用 { target: "文件或目录" } 限定范围；扫描整个工作区请传 {}。')
+  }
+  const args = raw as Record<string, unknown>
+  const unknown = Object.keys(args).filter(key => !allowed.includes(key))
+  if (unknown.length > 0) {
+    throw new Error('不支持的扫描参数：' + unknown.join('、') + '。请使用 target 指定一个文件或目录；仅省略 target 或使用 target: "." 才扫描整个工作区。')
+  }
+  if (Object.hasOwn(args, 'target') && (typeof args.target !== 'string' || args.target.trim() === '')) {
+    throw new Error('扫描参数 target 必须是非空的文件或目录字符串。扫描整个工作区请省略 target 或使用 "."。')
+  }
+  return args
 }
 
 const findingSchema = {
@@ -91,7 +107,7 @@ function baselineSummary(value: unknown): { fresh: Finding[]; accepted: Finding[
   }
 }
 
-function renderFindings(value: unknown): ContentBlock[] {
+function renderFindings(_args: unknown, value: unknown): ContentBlock[] {
   const rec = (value ?? {}) as Record<string, unknown>
   const findings = Array.isArray(rec.findings) ? rec.findings as Finding[] : []
   const counts = rec.counts as Record<string, unknown> | undefined
@@ -111,13 +127,13 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
 
   const secureScan: SecureToolDefinition = {
     name: 'secure_scan',
-    description: '扫描工作区（或指定文件/目录），用确定性规则检测注入、弱加密、硬编码密钥、危险配置等问题。结果写入 .code-security 状态供 secure_fix_verify 对比。',
-    parameters: compileParameters({
+    description: '扫描工作区（或指定文件/目录），用确定性规则检测注入、弱加密、硬编码密钥、危险配置等问题。使用 target 字符串限定范围，不接受 paths/files 等参数；{} 表示整个工作区。结果写入 .code-security 状态供 secure_fix_verify 对比。',
+    parameters: { ...compileParameters({
       target: { type: 'string', description: '要扫描的文件或目录（可选，缺省扫描整个工作区）。' },
-    }),
+    }), additionalProperties: false },
     output: { schema: scanSchema, render: renderFindings },
     async execute(rawArgs: unknown) {
-      const args = (rawArgs ?? {}) as Record<string, unknown>
+      const args = scanArguments(rawArgs)
       const target = optionalString(args, 'target')
       const policy = await loadPolicy(cwd)
       const failOn = policy.failOn ?? cfg.failOn
@@ -143,14 +159,14 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
   const secureDiff: SecureToolDefinition = {
     name: 'secure_diff',
     description: '只审查 git diff 的新增行（默认 HEAD，即未提交改动）。base 可用任意 git ref；staged=true 审查已暂存改动；target 可限定文件。结果同样写入状态。',
-    parameters: compileParameters({
+    parameters: { ...compileParameters({
       base: { type: 'string', description: 'git 基线（默认 HEAD）。' },
       target: { type: 'string', description: '限定文件路径（可选）。' },
       staged: { type: 'boolean', description: '审查已暂存改动（git diff --cached，默认 false）。' },
-    }),
+    }), additionalProperties: false },
     output: { schema: scanSchema, render: renderFindings },
     async execute(rawArgs: unknown) {
-      const args = (rawArgs ?? {}) as Record<string, unknown>
+      const args = scanArguments(rawArgs, ['base', 'target', 'staged'])
       const base = optionalString(args, 'base') ?? 'HEAD'
       const target = optionalString(args, 'target')
       const policy = await loadPolicy(cwd)
@@ -178,9 +194,9 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
   const secureFixVerify: SecureToolDefinition = {
     name: 'secure_fix_verify',
     description: '复扫并与上次扫描基线对比，输出已关闭、仍存在、新引入的问题指纹。用于修复后确认没有按下葫芦浮起瓢。',
-    parameters: compileParameters({
+    parameters: { ...compileParameters({
       target: { type: 'string', description: '复扫文件或目录（可选，缺省扫描整个工作区）。' },
-    }),
+    }), additionalProperties: false },
     output: {
       schema: {
         type: 'object',
@@ -198,7 +214,7 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
       },
     },
     async execute(rawArgs: unknown) {
-      const args = (rawArgs ?? {}) as Record<string, unknown>
+      const args = scanArguments(rawArgs)
       const target = optionalString(args, 'target')
       const policy = await loadPolicy(cwd)
       const state = await loadState(stateDir)

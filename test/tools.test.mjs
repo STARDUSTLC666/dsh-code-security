@@ -23,6 +23,39 @@ const fakeRunner = {
   },
 }
 
+for (const name of ['secure_scan', 'secure_diff', 'secure_fix_verify']) {
+  test(`${name} rejects misspelled or invalid targets before scanning or changing state`, async (t) => {
+    const { dir, cfg } = await world({ 'selected.js': 'const safe = 1\n', 'unselected.js': 'eval(input)\n' })
+    t.after(() => fs.rm(dir, { recursive: true, force: true }))
+    let calls = 0
+    const tools = buildSecureTools(cfg, dir, { async run() { calls++; return { exitCode: 0, signal: null, stdout: '', stderr: '' } } })
+    await tools.find(t => t.name === 'secure_scan').execute({ target: 'selected.js' }, {})
+    const stateFile = path.join(dir, '.code-security/state.json')
+    const before = await fs.readFile(stateFile, 'utf8')
+    const tool = tools.find(t => t.name === name)
+    for (const args of [{ paths: ['selected.js'] }, { files: 'selected.js' }, { target: 'selected.js', glob: '*.js' }, { target: '' }, { target: '  ' }, { target: null }, { target: ['selected.js'] }, 'selected.js']) {
+      await assert.rejects(tool.execute(args, {}), /参数|target/)
+      assert.equal(await fs.readFile(stateFile, 'utf8'), before)
+    }
+    assert.equal(calls, 0, 'invalid diff targets must not invoke git')
+  })
+}
+
+test('secure_scan keeps a valid file scope and still accepts an explicit whole-workspace scan', async (t) => {
+  const { dir, cfg } = await world({ 'selected.js': 'const safe = 1\n', 'unselected.js': 'eval(input)\n' })
+  t.after(() => fs.rm(dir, { recursive: true, force: true }))
+  const scan = buildSecureTools(cfg, dir, fakeRunner).find(t => t.name === 'secure_scan')
+  const args = { target: ' selected.js ' }
+  const selected = await scan.execute(args, {})
+  assert.equal(selected.filesScanned, 1)
+  assert.match(scan.output.render(args, selected)[0].text, /安全审查：通过\n文件 1 个/)
+  const all = await scan.execute({}, {})
+  assert.equal(all.filesScanned, 2)
+  assert.equal(all.counts.critical, 1)
+  assert.match(scan.output.render({}, all)[0].text, /critical 1/)
+  assert.match(scan.output.render({}, all)[0].text, /unselected\.js/)
+})
+
 test('secure_scan 写入状态并给出门禁结论', async () => {
   const { dir, cfg } = await world({ 'src/bad.js': 'eval(user)\n' })
   const tools = buildSecureTools(cfg, dir, fakeRunner)
@@ -57,6 +90,8 @@ test('secure_diff 使用 git diff 结果', async () => {
   const value = await tools.find(t => t.name === 'secure_diff').execute({ base: 'HEAD' }, {})
   assert.equal(value.findings.length, 1)
   assert.equal(value.findings[0].ruleId, 'SEC-001')
+  assert.match(tools.find(t => t.name === 'secure_diff').output.render({ base: 'HEAD' }, value)[0].text, /critical 1/)
+  assert.match(tools.find(t => t.name === 'secure_diff').output.render({ base: 'HEAD' }, value)[0].text, /x\.js/)
   await fs.rm(dir, { recursive: true, force: true })
 })
 

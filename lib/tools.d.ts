@@ -18,6 +18,7 @@ export interface SecureToolDefinition {
         type: 'object';
         properties: Record<string, unknown>;
         required?: string[];
+        additionalProperties?: boolean;
     };
     output: {
         schema: Record<string, unknown>;
