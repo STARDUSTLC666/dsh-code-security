@@ -1,42 +1,44 @@
 # dsh-code-security
 
-## 0.3.6 update (2026-09-28)
+[中文](README.md)
 
-Rejects unknown scan arguments and empty targets before scanning or replacing state, preventing misspelled scopes from expanding to the whole workspace. Fixes standard-mode output incorrectly displaying zero files and a failed verdict: counts, verdicts and findings now come from the actual scan result.
+Run local static security checks on code or Git changes and verify fixes.
 
-Validation host: Harness `0.2.0-rc.1` built from official sources (commit `407e65c8`) with Node `24.16.0` on 2026-09-28. All 31 plugin tests pass in an isolated environment; all 18 plugins mount together in one host registering 10 tools, with tool schemas and health-check contracts passing. No live ports or external services were exercised in this round.
+[![npm](https://img.shields.io/npm/v/dsh-code-security)](https://www.npmjs.com/package/dsh-code-security) [![downloads](https://img.shields.io/npm/dm/dsh-code-security)](https://www.npmjs.com/package/dsh-code-security)
 
-![npm](https://img.shields.io/npm/v/dsh-code-security) ![downloads](https://img.shields.io/npm/dm/dsh-code-security) ![license](https://img.shields.io/github/license/STARDUSTLC666/dsh-code-security) ![stars](https://img.shields.io/github/stars/STARDUSTLC666/dsh-code-security?style=social)
+## What it does
 
-> Every agent code change passes a local security scan before delivery.
+- Scan files, directories or Git diffs with locations and code evidence.
+- Recheck fixes and manage baselines or scan policy.
+- Export Markdown or SARIF reports and inspect dependency manifests.
 
-A DeepSeek Harness plugin for AI code security review: deterministic rule engine, git-diff incremental review, fix-verify loop, and policy gate. Methodology borrows from Codex security skills (evidence-first findings, severity ordering, supply-chain layers). Zero runtime dependencies.
+## Install
 
-## Compatibility
-
-2026-09-13 fix: retain the service receiver when calling `subprocess.spawn`, preventing failures caused by passing the method as an unbound callback. Verified against a real isolated host subprocess service. `secure_diff` reads a real isolated Git repository through the host subprocess service and reports the changed file and added line.
-
-## Tools
-
-| Tool | Purpose | Write |
-| :-- | :-- | :-- |
-| `secure_scan` | Scan files with CWE/severity/line/snippet evidence | state |
-| `secure_diff` | Review only added lines of git diff | state |
-| `secure_fix_verify` | Compare with baseline: closed / remaining / fresh | state |
-| `secure_report` | Aggregate by rule/file with gate verdict | no |
-| `secure_export` | Export SARIF 2.1.0 / Markdown | file write approval |
-| `secure_baseline` | Accept current findings as baseline; gate on new issues only | approval |
-| `secure_deps` | SBOM-lite: parse dependency manifests and version-risk flags | no |
-| `secure_policy_show` | Show .code-security.json | no |
-| `secure_policy_set` | Replace policy JSON | approval |
-
-40+ deterministic rules: injection, deserialization, weak crypto (including shell TLS bypass flags), secrets, dangerous config, sensitive logging, path traversal, SSRF.
+In DSH Desktop, install `dsh-code-security` from the Plugins panel. If the bundled dsh command is available:
 
 ```bash
-dsh plugin --profile web add dsh-code-security
+dsh plugin --profile desktop add dsh-code-security
 ```
 
-MIT
+For the web version, replace `desktop` with `web`. Restart DSH after installation.
+
+## Start using it
+
+Ask: “Review the current Git diff for security findings, show evidence and recheck the fixes.”
+
+## Requirements and configuration
+
+Deterministic rules run locally. See the usage guide for rule coverage, baselines and policy configuration.
+
+Detailed configuration, tool arguments and troubleshooting are in the [usage guide](docs/USAGE.en.md). For standalone development, follow the Node requirement in [package.json](package.json).
+
+## Documentation
+
+- [Usage and troubleshooting](docs/USAGE.en.md)
+- [Changelog](CHANGELOG.md)
+- [Validation scope and history](docs/VALIDATION.md)
+- [Report a problem or suggest a feature](https://github.com/STARDUSTLC666/dsh-code-security/issues)
+
 ## License
 
-MIT (see [LICENSE](LICENSE))
+[MIT](LICENSE)
