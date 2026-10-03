@@ -2,6 +2,8 @@
 
 [English](README.en.md)
 
+![dsh-code-security 鲸鱼娘插件封面](https://raw.githubusercontent.com/STARDUSTLC666/dsh-code-security/master/assets/cover-whale-girl.png)
+
 对代码与 Git 改动进行本地静态安全检查，并追踪修复结果。
 
 [![npm](https://img.shields.io/npm/v/dsh-code-security)](https://www.npmjs.com/package/dsh-code-security) [![downloads](https://img.shields.io/npm/dm/dsh-code-security)](https://www.npmjs.com/package/dsh-code-security)

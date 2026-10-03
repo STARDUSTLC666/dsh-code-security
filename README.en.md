@@ -2,6 +2,8 @@
 
 [中文](README.md)
 
+![dsh-code-security whale girl plugin cover](https://raw.githubusercontent.com/STARDUSTLC666/dsh-code-security/master/assets/cover-whale-girl.png)
+
 Run local static security checks on code or Git changes and verify fixes.
 
 [![npm](https://img.shields.io/npm/v/dsh-code-security)](https://www.npmjs.com/package/dsh-code-security) [![downloads](https://img.shields.io/npm/dm/dsh-code-security)](https://www.npmjs.com/package/dsh-code-security)
