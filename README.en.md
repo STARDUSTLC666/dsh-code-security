@@ -6,7 +6,7 @@
 
 Run local static security checks on code or Git changes and verify fixes.
 
-[![npm](https://img.shields.io/npm/v/dsh-code-security)](https://www.npmjs.com/package/dsh-code-security) [![downloads](https://img.shields.io/npm/dm/dsh-code-security)](https://www.npmjs.com/package/dsh-code-security)
+[![npm](https://img.shields.io/npm/v/dsh-code-security)](https://www.npmjs.com/package/dsh-code-security) [![downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-code-security-downloads.svg)](https://www.npmjs.com/package/dsh-code-security)
 
 ## What it does
 
