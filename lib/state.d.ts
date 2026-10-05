@@ -40,8 +40,8 @@ export interface StateDocument {
 export declare function findingFingerprint(finding: Finding): string;
 export declare function statePath(stateDir: string): string;
 export declare function loadState(stateDir: string): Promise<StateDocument>;
-export declare function saveState(stateDir: string, entry: ScanStateEntry): Promise<string>;
-export declare function saveBaseline(stateDir: string, baseline: BaselineEntry): Promise<string>;
+export declare function saveState(stateDir: string, entry: ScanStateEntry, signal?: AbortSignal): Promise<string>;
+export declare function saveBaseline(stateDir: string, baseline: BaselineEntry, signal?: AbortSignal): Promise<string>;
 export declare function countFindings(findings: Finding[]): {
     critical: number;
     high: number;

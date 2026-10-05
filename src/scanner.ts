@@ -38,6 +38,7 @@ export interface ScanOptions {
   maxFiles: number
   maxFileBytes: number
   policy: SecurePolicy
+  signal?: AbortSignal
 }
 
 const DISABLE_NEXT = /secure-review-disable-next-line(?:\s+([\w,-]+))?/
@@ -206,13 +207,16 @@ export async function scanPath(options: ScanOptions): Promise<ScanResult> {
   const relRoot = path.relative(cwd, root) || '.'
 
   const visit = async (absolute: string, rel: string): Promise<void> => {
+    options.signal?.throwIfAborted()
     let stat
     try {
-      stat = await fs.stat(absolute)
+      stat = await fs.lstat(absolute)
     } catch {
       filesSkipped += 1
       return
     }
+    options.signal?.throwIfAborted()
+    if (stat.isSymbolicLink()) { filesSkipped += 1; return }
     if (stat.isDirectory()) {
       if (DEFAULT_EXCLUDE_DIRS.includes(path.basename(absolute)) || policyExcludesDir(policy, rel)) return
       let entries
@@ -248,6 +252,7 @@ export async function scanPath(options: ScanOptions): Promise<ScanResult> {
       return
     }
     filesScanned += 1
+    options.signal?.throwIfAborted()
     const text = new TextDecoder('utf-8', { fatal: false }).decode(buffer)
     findings.push(...scanText(text, absolute, rel, policy))
   }

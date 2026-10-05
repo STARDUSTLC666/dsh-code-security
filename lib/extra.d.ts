@@ -5,4 +5,4 @@
  */
 import { type ResolvedSecureConfig } from './config.js';
 import type { SecureToolDefinition } from './tools.js';
-export declare function buildExtraTools(cfg: ResolvedSecureConfig, cwd: string): SecureToolDefinition[];
+export declare function buildExtraTools(cfg: ResolvedSecureConfig, cwd: string, signal?: AbortSignal): SecureToolDefinition[];

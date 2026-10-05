@@ -12,7 +12,7 @@ export interface RunResult {
 }
 
 export interface ProcessRunner {
-  run(argv: readonly string[], options?: { timeoutMs?: number }): Promise<RunResult>
+  run(argv: readonly string[], options?: { timeoutMs?: number; cwd?: string; signal?: AbortSignal }): Promise<RunResult>
 }
 
 export interface SubprocessHandleLike {
@@ -41,14 +41,16 @@ export function createSubprocessRunner(spawn: SubprocessSpawnLike, graceMs: numb
     async run(argv, options) {
       const timeoutMs = options?.timeoutMs ?? defaultTimeoutMs
       const controller = new AbortController()
+      const signal = options?.signal ? AbortSignal.any([options.signal, controller.signal]) : controller.signal
+      signal.throwIfAborted()
       const timer = setTimeout(() => controller.abort(new Error('git diff timed out')), timeoutMs)
       try {
         const handle = spawn({
           argv,
-          cwd: process.cwd(),
+          cwd: options?.cwd ?? process.cwd(),
           stdio: { stdin: 'ignore', stdout: { maxBytes: COLLECT_BYTES }, stderr: { maxBytes: COLLECT_BYTES } },
           graceMs,
-          signal: controller.signal,
+          signal,
         })
         const outcome = await handle.done
         return {

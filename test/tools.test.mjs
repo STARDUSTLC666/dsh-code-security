@@ -124,6 +124,8 @@ test('secure_export 生成 SARIF 与 Markdown', async () => {
   const sarif = await exportTool.execute({ format: 'sarif' }, {})
   assert.equal(sarif.findingCount, 1)
   assert.equal(JSON.parse(sarif.text).version, '2.1.0')
+  const pkg = JSON.parse(await fs.readFile(new URL('../package.json', import.meta.url), 'utf8'))
+  assert.equal(JSON.parse(sarif.text).runs[0].tool.driver.version, pkg.version)
   const markdown = await exportTool.execute({ format: 'markdown' }, {})
   assert.match(markdown.text, /# 安全审查报告/)
   const target = path.join(dir, 'report.sarif')

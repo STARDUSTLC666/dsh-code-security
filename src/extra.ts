@@ -23,7 +23,7 @@ function compileParameters(spec: Record<string, any>): { type: 'object'; propert
   return { type: 'object', properties, ...(required.length > 0 ? { required } : {}) }
 }
 
-export function buildExtraTools(cfg: ResolvedSecureConfig, cwd: string): SecureToolDefinition[] {
+export function buildExtraTools(cfg: ResolvedSecureConfig, cwd: string, signal?: AbortSignal): SecureToolDefinition[] {
   const stateDir = cfg.stateDir
 
   const secureBaseline: SecureToolDefinition = {
@@ -52,7 +52,7 @@ export function buildExtraTools(cfg: ResolvedSecureConfig, cwd: string): SecureT
         fingerprints: state.last.fingerprints,
         counts: state.last.counts,
       }
-      const file = await saveBaseline(stateDir, baseline)
+      const file = await saveBaseline(stateDir, baseline, signal)
       return { file, acceptedCount: baseline.findings.length, baseline }
     },
     timeoutMs: 10000,

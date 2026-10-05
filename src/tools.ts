@@ -7,6 +7,7 @@
  */
 
 import { writeFile } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { optionalString, requiredString, type ResolvedSecureConfig, type Severity } from './config.js'
@@ -34,6 +35,7 @@ export interface SecureToolDefinition {
 }
 
 const SEVERITY_ORDER: Record<Severity, number> = { critical: 4, high: 3, medium: 2, low: 1 }
+const PACKAGE_VERSION: string = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version
 
 function compileParameters(spec: Record<string, any>): { type: 'object'; properties: Record<string, unknown>; required?: string[] } {
   const properties: Record<string, unknown> = {}
@@ -123,6 +125,19 @@ function renderFindings(_args: unknown, value: unknown): ContentBlock[] {
 }
 
 export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner: ProcessRunner): SecureToolDefinition[] {
+  return buildWorkspaceTools(cfg, cwd, runner).map(tool => ({ ...tool, async execute(args: unknown, exec: unknown) {
+    const context = exec as { signal?: AbortSignal; agent?: { session?: { header?: { cwd?: string } } } } | undefined
+    const signal = context?.signal
+    signal?.throwIfAborted()
+    const workspace = context?.agent?.session?.header?.cwd || cwd
+    const resolved = { ...cfg, stateDir: cfg.stateDirRelative ? path.resolve(workspace, cfg.stateDirRelative) : cfg.stateDir }
+    const scopedRunner: ProcessRunner = { run: (argv, options) => runner.run(argv, { ...options, cwd: workspace, signal }) }
+    const selected = buildWorkspaceTools(resolved, workspace, scopedRunner, signal).find(row => row.name === tool.name)!
+    return selected.execute(args, exec)
+  } }))
+}
+
+function buildWorkspaceTools(cfg: ResolvedSecureConfig, cwd: string, runner: ProcessRunner, signal?: AbortSignal): SecureToolDefinition[] {
   const stateDir = cfg.stateDir
 
   const secureScan: SecureToolDefinition = {
@@ -137,7 +152,7 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
       const target = optionalString(args, 'target')
       const policy = await loadPolicy(cwd)
       const failOn = policy.failOn ?? cfg.failOn
-      const result = await scanPath({ cwd, target, maxFiles: cfg.maxFiles, maxFileBytes: cfg.maxFileBytes, policy })
+      const result = await scanPath({ cwd, target, maxFiles: cfg.maxFiles, maxFileBytes: cfg.maxFileBytes, policy, signal })
       const state = await loadState(stateDir)
       const counts = countFindings(result.findings)
       const split = splitByBaseline(result.findings, state.baseline)
@@ -150,7 +165,7 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
         fingerprints: result.findings.map(findingFingerprint),
         counts,
       }
-      const stateFile = await saveState(stateDir, entry)
+      const stateFile = await saveState(stateDir, entry, signal)
       return { ...result, counts, newFindings: split.fresh, newCounts: countFindings(split.fresh), acceptedFindings: split.accepted, baseline: state.baseline, passed: verdictOf(split.fresh, failOn), failOn, stateFile }
     },
     timeoutMs: 120000,
@@ -185,7 +200,7 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
         fingerprints: result.findings.map(findingFingerprint),
         counts,
       }
-      await saveState(stateDir, entry)
+      await saveState(stateDir, entry, signal)
       return { root: base, filesScanned: result.filesChanged, filesSkipped: 0, addedLines: result.addedLines, findings: result.findings, counts, newFindings: split.fresh, newCounts: countFindings(split.fresh), acceptedFindings: split.accepted, baseline: state.baseline, passed: verdictOf(split.fresh, failOn), failOn, durationMs: 0 }
     },
     timeoutMs: 60000,
@@ -218,7 +233,7 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
       const target = optionalString(args, 'target')
       const policy = await loadPolicy(cwd)
       const state = await loadState(stateDir)
-      const result = await scanPath({ cwd, target, maxFiles: cfg.maxFiles, maxFileBytes: cfg.maxFileBytes, policy })
+      const result = await scanPath({ cwd, target, maxFiles: cfg.maxFiles, maxFileBytes: cfg.maxFileBytes, policy, signal })
       if (state.last === null) {
         return { baselineMissing: true, baselineTime: '', closedCount: 0, remainingCount: 0, freshCount: result.findings.length, closed: [], remaining: [], fresh: result.findings, passed: false }
       }
@@ -334,7 +349,7 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
         throw new Error('policy 参数不是合法 JSON。')
       }
       const policy = normalizePolicy((parsed ?? {}) as Record<string, unknown>)
-      const file = await savePolicy(cwd, policy)
+      const file = await savePolicy(cwd, policy, signal)
       return { file, policy }
     },
     timeoutMs: 10000,
@@ -365,6 +380,7 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
       const state = await loadState(stateDir)
       if (state.last === null) throw new Error('尚无扫描结果，请先执行 secure_scan 或 secure_diff。')
       const text = format === 'sarif' ? buildSarif(state.last.findings, cwd) : buildMarkdown(state.last.findings, state.last.target)
+      signal?.throwIfAborted()
       if (target !== undefined) await writeFile(target, text, 'utf8')
       return { format, path: target ?? '', text, findingCount: state.last.findings.length }
     },
@@ -398,7 +414,7 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
     },
   }
 
-  return [secureScan, secureDiff, secureFixVerify, secureReport, secureExport, ...buildExtraTools(cfg, cwd), policyShow, policySet, secureHealth]
+  return [secureScan, secureDiff, secureFixVerify, secureReport, secureExport, ...buildExtraTools(cfg, cwd, signal), policyShow, policySet, secureHealth]
 }
 
 function buildMarkdown(findings: Finding[], target: string): string {
@@ -425,7 +441,7 @@ function buildSarif(findings: Finding[], cwd: string): string {
     version: '2.1.0',
     $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
     runs: [{
-      tool: { driver: { name: 'dsh-code-security', version: '0.1.0', informationUri: 'https://github.com/STARDUSTLC666/dsh-code-security', rules: [...rules.values()] } },
+      tool: { driver: { name: 'dsh-code-security', version: PACKAGE_VERSION, informationUri: 'https://github.com/STARDUSTLC666/dsh-code-security', rules: [...rules.values()] } },
       originalUriBaseIds: { ROOTPATH: { uri: pathToFileURL(path.resolve(cwd) + path.sep).href } },
       results,
     }],

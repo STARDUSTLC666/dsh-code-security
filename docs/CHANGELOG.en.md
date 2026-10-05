@@ -4,6 +4,10 @@
 
 These English notes preserve the earlier translations. The main changelog contains the consolidated version history.
 
+## 0.3.7 (2026-10-05)
+
+- Use the session workspace for scans, policy, reports and git diff. Respect cancellation and skip directory junctions. Lock history/baseline merges and preserve damaged files with explicit errors.
+
 ## 0.3.5 (2026-09-28)
 
 Rejects unknown scan arguments and empty targets before scanning or replacing state, preventing misspelled scopes from expanding to the whole workspace. Fixes standard-mode output incorrectly displaying zero files and a failed verdict: counts, verdicts and findings now come from the actual scan result.

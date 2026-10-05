@@ -15,6 +15,7 @@ export interface ResolvedSecureConfig {
     maxFileBytes: number;
     failOn: Severity;
     stateDir: string;
+    stateDirRelative?: string;
 }
 export declare const DEFAULT_EXCLUDE_DIRS: string[];
 export declare function resolveConfig(config: SecureConfig | undefined | null, cwd?: string): ResolvedSecureConfig;

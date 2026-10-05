@@ -30,6 +30,7 @@ export interface ScanOptions {
     maxFiles: number;
     maxFileBytes: number;
     policy: SecurePolicy;
+    signal?: AbortSignal;
 }
 export interface LineEntry {
     line: number;

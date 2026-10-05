@@ -2,6 +2,10 @@
 
 [Overview](../README.en.md) · [Changelog](../CHANGELOG.md) · [Validation](VALIDATION.md)
 
+## Current improvements
+
+Relative stateDir defaults to .code-security in the session workspace. Concurrent scans retain both histories. Damaged records must be inspected after backup rather than silently recreated. Scans skip symlinks and junctions; static rules do not replace a full security audit.
+
 ## Tools
 
 | Tool | Purpose | Write |

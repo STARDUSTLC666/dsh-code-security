@@ -35,7 +35,7 @@ export async function runGitDiff(runner: ProcessRunner, cwd: string, base: strin
   if (staged) argv.push('--cached')
   argv.push('--no-ext-diff', '--unified=0', base)
   if (target !== undefined && target.trim() !== '') argv.push('--', target.trim())
-  const result = await runner.run(argv, { timeoutMs })
+  const result = await runner.run(argv, { timeoutMs, cwd })
   if (result.exitCode !== 0 && result.exitCode !== 1) {
     throw new Error('git diff 失败（退出码 ' + String(result.exitCode) + '）：' + result.stderr.trim().split(/\r?\n/).slice(-4).join(' | '))
   }

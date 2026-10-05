@@ -20,6 +20,7 @@ export interface ResolvedSecureConfig {
   maxFileBytes: number
   failOn: Severity
   stateDir: string
+  stateDirRelative?: string
 }
 
 export const DEFAULT_EXCLUDE_DIRS = ['node_modules', '.git', 'dist', 'build', 'out', 'coverage', '.next', '.cache', '.turbo', '.code-security']
@@ -38,7 +39,8 @@ export function resolveConfig(config: SecureConfig | undefined | null, cwd = pro
   }
   const failOn: Severity = cfg.failOn === 'critical' || cfg.failOn === 'high' || cfg.failOn === 'medium' || cfg.failOn === 'low' ? cfg.failOn : 'medium'
   const stateDir = typeof cfg.stateDir === 'string' && cfg.stateDir.trim() !== '' ? path.resolve(cwd, cfg.stateDir.trim()) : path.join(cwd, '.code-security')
-  return { maxFiles, maxFileBytes, failOn, stateDir }
+  const rawStateDir = typeof cfg.stateDir === 'string' && cfg.stateDir.trim() ? cfg.stateDir.trim() : '.code-security'
+  return { maxFiles, maxFileBytes, failOn, stateDir, ...(path.isAbsolute(rawStateDir) ? {} : { stateDirRelative: rawStateDir }) }
 }
 
 export function optionalString(args: Record<string, unknown>, key: string): string | undefined {
