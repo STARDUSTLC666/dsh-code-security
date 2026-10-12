@@ -94,7 +94,7 @@ function shannon(text: string): number {
 const TOKEN_PATTERN = /['"]([A-Za-z0-9+/=_-]{24,})['"]/g
 const HIGH_ENTROPY_THRESHOLD = 3.8
 
-function detectHighEntropy(line: string, lineNumber: number, file: string, rel: string, rule: SecurityRule): Finding[] {
+function detectHighEntropy(line: string, lineNumber: number, rel: string, rule: SecurityRule): Finding[] {
   const findings: Finding[] = []
   for (const match of line.matchAll(TOKEN_PATTERN)) {
     const token = match[1]!
@@ -128,21 +128,60 @@ export interface LineEntry {
   text: string
 }
 
+function scanFileRule(entries: LineEntry[], rel: string, rule: SecurityRule, disabledNext: ReadonlyMap<number, string[] | null | undefined>, selectedLines?: ReadonlySet<number>): Finding | undefined {
+  let block: LineEntry[] = []
+  const checkBlock = (): Finding | undefined => {
+    if (block.length === 0) return undefined
+    const text = block.map(entry => entry.text).join('\n')
+    let best: { index: number; start: number; end: number } | undefined
+    for (const pattern of rule.patterns) {
+      const regex = new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : pattern.flags + 'g')
+      for (const match of text.matchAll(regex)) {
+        const index = match.index!
+        const start = text.slice(0, index).split('\n').length - 1
+        const end = start + match[0].split('\n').length - 1
+        if (selectedLines !== undefined && !block.slice(start, end + 1).some(entry => selectedLines.has(entry.line))) continue
+        if (best === undefined || index < best.index) best = { index, start, end }
+        break
+      }
+    }
+    if (best === undefined) return undefined
+    const line = block[best.start]!.line
+    const snippet = block.slice(best.start, best.end + 1).map(entry => entry.text).join('\n')
+    return {
+      id: makeId(rule.id, rel, line, snippet), ruleId: rule.id, title: rule.title,
+      cwe: rule.cwe, severity: rule.severity, confidence: rule.confidence,
+      file: rel, line, snippet: snippet.trim().slice(0, 200), message: rule.message,
+    }
+  }
+  for (const entry of entries) {
+    const suppressed = isComment(entry.text) || shouldSkipLine(rule, disabledNext.get(entry.line))
+    if (suppressed || block.length > 0 && entry.line !== block.at(-1)!.line + 1) {
+      const finding = checkBlock()
+      if (finding !== undefined) return finding
+      block = []
+    }
+    if (!suppressed) block.push(entry)
+  }
+  return checkBlock()
+}
+
 /** 对带行号的文本行应用规则（全量扫描与 git diff 增量扫描共用）。 */
-export function scanLineSet(entries: LineEntry[], rel: string, policy: SecurePolicy): Finding[] {
+export function scanLineSet(entries: LineEntry[], rel: string, policy: SecurePolicy, selectedLines?: ReadonlySet<number>): Finding[] {
   const language = languageForFile(rel)
   const findings: Finding[] = []
-  const applied = RULES.filter((rule) => rule.languages.includes(language) || rule.languages.includes('any'))
+  const applied = RULES.filter((rule) => (rule.languages.includes(language) || rule.languages.includes('any')) && !policyIgnores(policy, rule.id, rel))
+  const entropyRule = applied.find((rule) => rule.id === 'SEC-304')
   const prevDisable = new Map<number, string[] | null | undefined>()
   for (const entry of entries) {
     if (isComment(entry.text)) prevDisable.set(entry.line + 1, disabledRules(entry.text, DISABLE_NEXT))
   }
   for (const entry of entries) {
+    if (selectedLines !== undefined && !selectedLines.has(entry.line)) continue
     const isCommentLine = isComment(entry.text)
     const currentDisable = isCommentLine ? disabledRules(entry.text, DISABLE_LINE) : null
     for (const rule of applied) {
       if (rule.id === 'SEC-304') continue
-      if (policyIgnores(policy, rule.id, rel)) continue
       if (shouldSkipLine(rule, currentDisable) || shouldSkipLine(rule, prevDisable.get(entry.line))) continue
       if (rule.fileLevel === true) continue
       if (isCommentLine) continue
@@ -160,10 +199,14 @@ export function scanLineSet(entries: LineEntry[], rel: string, policy: SecurePol
         message: rule.message,
       })
     }
-    const entropyRule = RULES.find((rule) => rule.id === 'SEC-304')
-    if (entropyRule !== undefined && !policyIgnores(policy, entropyRule.id, rel) && !isCommentLine && !shouldSkipLine(entropyRule, currentDisable) && !shouldSkipLine(entropyRule, prevDisable.get(entry.line))) {
-      findings.push(...detectHighEntropy(entry.text, entry.line, rel, rel, entropyRule))
+    if (entropyRule !== undefined && !isCommentLine && !shouldSkipLine(entropyRule, currentDisable) && !shouldSkipLine(entropyRule, prevDisable.get(entry.line))) {
+      findings.push(...detectHighEntropy(entry.text, entry.line, rel, entropyRule))
     }
+  }
+  for (const rule of applied) {
+    if (rule.fileLevel !== true) continue
+    const finding = scanFileRule(entries, rel, rule, prevDisable, selectedLines)
+    if (finding !== undefined) findings.push(finding)
   }
   return findings
 }
@@ -172,28 +215,14 @@ export function scanLineSet(entries: LineEntry[], rel: string, policy: SecurePol
 export function scanText(content: string, file: string, rel: string, policy: SecurePolicy): Finding[] {
   const lines = content.split(/\r?\n/)
   const entries: LineEntry[] = lines.map((text, index) => ({ line: index + 1, text }))
-  const findings = scanLineSet(entries, rel, policy)
-  const language = languageForFile(rel)
-  const applied = RULES.filter((rule) => rule.languages.includes(language) || rule.languages.includes('any'))
-  for (const rule of applied) {
-    if (rule.fileLevel !== true) continue
-    if (policyIgnores(policy, rule.id, rel)) continue
-    if (rule.patterns.some((pattern) => pattern.test(content))) {
-      findings.push({
-        id: makeId(rule.id, rel, 1, content.slice(0, 80)),
-        ruleId: rule.id,
-        title: rule.title,
-        cwe: rule.cwe,
-        severity: rule.severity,
-        confidence: rule.confidence,
-        file: rel,
-        line: 1,
-        snippet: content.slice(0, 200),
-        message: rule.message,
-      })
-    }
-  }
-  return findings
+  // Match file rules over contiguous lines, sharing locations and suppressions
+  // with incremental scans without joining unrelated diff hunks.
+  return scanLineSet(entries, rel, policy)
+}
+
+/** Apply the same exclusions to full scans, directly selected files and diffs. */
+export function isExcludedPath(rel: string, policy: SecurePolicy): boolean {
+  return rel.split('/').some((part) => DEFAULT_EXCLUDE_DIRS.includes(part)) || policyExcludesDir(policy, rel)
 }
 
 /** 扫描目录或单个文件。 */
@@ -204,10 +233,14 @@ export async function scanPath(options: ScanOptions): Promise<ScanResult> {
   let filesScanned = 0
   let filesSkipped = 0
   const findings: Finding[] = []
-  const relRoot = path.relative(cwd, root) || '.'
+  const relRoot = path.relative(cwd, root).split(path.sep).join('/')
 
   const visit = async (absolute: string, rel: string): Promise<void> => {
     options.signal?.throwIfAborted()
+    if (isExcludedPath(rel, policy)) {
+      filesSkipped += 1
+      return
+    }
     let stat
     try {
       stat = await fs.lstat(absolute)
@@ -218,7 +251,7 @@ export async function scanPath(options: ScanOptions): Promise<ScanResult> {
     options.signal?.throwIfAborted()
     if (stat.isSymbolicLink()) { filesSkipped += 1; return }
     if (stat.isDirectory()) {
-      if (DEFAULT_EXCLUDE_DIRS.includes(path.basename(absolute)) || policyExcludesDir(policy, rel)) return
+      if (DEFAULT_EXCLUDE_DIRS.includes(path.basename(absolute))) return
       let entries
       try {
         entries = await fs.readdir(absolute, { withFileTypes: true })

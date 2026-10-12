@@ -1,7 +1,7 @@
 /**
- * 九个面向模型的安全审查工具：
+ * 十个面向模型的安全审查工具：
  * secure_scan / secure_diff / secure_fix_verify / secure_report / secure_export /
- * secure_baseline / secure_deps / secure_policy_show / secure_policy_set。
+ * secure_baseline / secure_deps / secure_policy_show / secure_policy_set / secure_health。
  *
  * @module dsh-code-security/tools
  */
@@ -64,6 +64,12 @@ function scanArguments(raw: unknown, allowed: readonly string[] = ['target']): R
   if (Object.hasOwn(args, 'target') && (typeof args.target !== 'string' || args.target.trim() === '')) {
     throw new Error('扫描参数 target 必须是非空的文件或目录字符串。扫描整个工作区请省略 target 或使用 "."。')
   }
+  if (Object.hasOwn(args, 'base') && (typeof args.base !== 'string' || args.base.trim() === '' || args.base.trim().startsWith('-') || args.base.includes('\0'))) {
+    throw new Error('扫描参数 base 必须是非空的 Git ref，不能是 Git 命令选项。')
+  }
+  if (Object.hasOwn(args, 'staged') && typeof args.staged !== 'boolean') {
+    throw new Error('扫描参数 staged 必须是布尔值 true 或 false。')
+  }
   return args
 }
 
@@ -87,6 +93,7 @@ const scanSchema = {
   type: 'object',
   properties: {
     root: { type: 'string' }, filesScanned: { type: 'integer' }, filesSkipped: { type: 'integer' },
+    filesChanged: { type: 'integer' }, addedLines: { type: 'integer' },
     findings: { type: 'array', items: findingSchema }, counts: countsSchema, passed: { type: 'boolean' },
     failOn: { type: 'string' }, durationMs: { type: 'integer' },
     newFindings: { type: 'array', items: findingSchema }, newCounts: countsSchema,
@@ -118,6 +125,7 @@ function renderFindings(_args: unknown, value: unknown): ContentBlock[] {
     '安全审查：' + (rec.passed === true ? '通过' : '未通过'),
     '文件 ' + String(rec.filesScanned ?? 0) + ' 个，发现 ' + findings.length + ' 个问题（critical ' + String(counts?.critical ?? 0) + ' / high ' + String(counts?.high ?? 0) + ' / medium ' + String(counts?.medium ?? 0) + ' / low ' + String(counts?.low ?? 0) + '）；基线外新增 ' + split.fresh.length + ' 个。',
   ]
+  if (typeof rec.filesSkipped === 'number' && rec.filesSkipped > 0) lines.push('已跳过 ' + rec.filesSkipped + ' 项；跳过项不计入已扫描文件数。')
   for (const finding of findings) {
     lines.push('- ' + finding.file + ':' + finding.line + ' [' + finding.severity + '] ' + finding.ruleId + ' ' + finding.title)
   }
@@ -173,7 +181,7 @@ function buildWorkspaceTools(cfg: ResolvedSecureConfig, cwd: string, runner: Pro
 
   const secureDiff: SecureToolDefinition = {
     name: 'secure_diff',
-    description: '只审查 git diff 的新增行（默认 HEAD，即未提交改动）。base 可用任意 git ref；staged=true 审查已暂存改动；target 可限定文件。结果同样写入状态。',
+    description: '结合少量上下文审查 git diff，只报告涉及新增行的问题（默认 HEAD，即未提交改动）。base 可用 Git ref；staged=true 审查已暂存改动；target 可限定文件。范围与路径相对当前会话工作区，遵守项目排除策略。结果同样写入状态。',
     parameters: { ...compileParameters({
       base: { type: 'string', description: 'git 基线（默认 HEAD）。' },
       target: { type: 'string', description: '限定文件路径（可选）。' },
@@ -195,13 +203,13 @@ function buildWorkspaceTools(cfg: ResolvedSecureConfig, cwd: string, runner: Pro
         mode: 'diff:' + base,
         target: target ?? '.',
         time: new Date().toISOString(),
-        filesScanned: result.filesChanged,
+        filesScanned: result.filesScanned,
         findings: result.findings,
         fingerprints: result.findings.map(findingFingerprint),
         counts,
       }
       await saveState(stateDir, entry, signal)
-      return { root: base, filesScanned: result.filesChanged, filesSkipped: 0, addedLines: result.addedLines, findings: result.findings, counts, newFindings: split.fresh, newCounts: countFindings(split.fresh), acceptedFindings: split.accepted, baseline: state.baseline, passed: verdictOf(split.fresh, failOn), failOn, durationMs: 0 }
+      return { root: base, filesChanged: result.filesChanged, filesScanned: result.filesScanned, filesSkipped: result.filesSkipped, addedLines: result.addedLines, findings: result.findings, counts, newFindings: split.fresh, newCounts: countFindings(split.fresh), acceptedFindings: split.accepted, baseline: state.baseline, passed: verdictOf(split.fresh, failOn), failOn, durationMs: 0 }
     },
     timeoutMs: 60000,
   }
@@ -238,7 +246,7 @@ function buildWorkspaceTools(cfg: ResolvedSecureConfig, cwd: string, runner: Pro
         return { baselineMissing: true, baselineTime: '', closedCount: 0, remainingCount: 0, freshCount: result.findings.length, closed: [], remaining: [], fresh: result.findings, passed: false }
       }
       const current = result.findings.map(findingFingerprint)
-      const cmp = compareFingerprints(state.last.fingerprints, current)
+      const cmp = compareFingerprints(state.last.findings.map(findingFingerprint), current)
       const byFingerprint = new Map(result.findings.map((finding) => [findingFingerprint(finding), finding]))
       const closed = cmp.closed.map((fp) => state.last!.findings.find((finding) => findingFingerprint(finding) === fp)).filter((x): x is Finding => x !== undefined)
       const remaining = cmp.remaining.map((fp) => byFingerprint.get(fp)).filter((x): x is Finding => x !== undefined)

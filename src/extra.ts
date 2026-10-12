@@ -7,7 +7,7 @@
 import path from 'node:path'
 import { optionalString, requiredString, type ResolvedSecureConfig } from './config.js'
 import { scanDeps } from './deps.js'
-import { loadState, saveBaseline } from './state.js'
+import { findingFingerprint, loadState, saveBaseline } from './state.js'
 import type { SecureToolDefinition } from './tools.js'
 
 function compileParameters(spec: Record<string, any>): { type: 'object'; properties: Record<string, unknown>; required?: string[] } {
@@ -49,7 +49,7 @@ export function buildExtraTools(cfg: ResolvedSecureConfig, cwd: string, signal?:
         target: state.last.target,
         reason,
         findings: state.last.findings,
-        fingerprints: state.last.fingerprints,
+        fingerprints: state.last.findings.map(findingFingerprint),
         counts: state.last.counts,
       }
       const file = await saveBaseline(stateDir, baseline, signal)

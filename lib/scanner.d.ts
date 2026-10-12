@@ -37,8 +37,10 @@ export interface LineEntry {
     text: string;
 }
 /** 对带行号的文本行应用规则（全量扫描与 git diff 增量扫描共用）。 */
-export declare function scanLineSet(entries: LineEntry[], rel: string, policy: SecurePolicy): Finding[];
+export declare function scanLineSet(entries: LineEntry[], rel: string, policy: SecurePolicy, selectedLines?: ReadonlySet<number>): Finding[];
 /** 扫描单个文件内容，按语言与行应用规则。 */
 export declare function scanText(content: string, file: string, rel: string, policy: SecurePolicy): Finding[];
+/** Apply the same exclusions to full scans, directly selected files and diffs. */
+export declare function isExcludedPath(rel: string, policy: SecurePolicy): boolean;
 /** 扫描目录或单个文件。 */
 export declare function scanPath(options: ScanOptions): Promise<ScanResult>;

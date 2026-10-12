@@ -1,7 +1,7 @@
 /**
- * 九个面向模型的安全审查工具：
+ * 十个面向模型的安全审查工具：
  * secure_scan / secure_diff / secure_fix_verify / secure_report / secure_export /
- * secure_baseline / secure_deps / secure_policy_show / secure_policy_set。
+ * secure_baseline / secure_deps / secure_policy_show / secure_policy_set / secure_health。
  *
  * @module dsh-code-security/tools
  */

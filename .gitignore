@@ -1,3 +1,4 @@
 node_modules/
 *.tgz
 .code-security/
+/test/.tmp/

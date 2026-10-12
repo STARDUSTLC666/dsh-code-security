@@ -13,10 +13,13 @@ export interface DiffLine {
 export interface DiffFile {
     file: string;
     added: DiffLine[];
+    context?: DiffLine[];
 }
 export interface DiffScanResult {
     base: string;
     filesChanged: number;
+    filesScanned: number;
+    filesSkipped: number;
     addedLines: number;
     findings: Finding[];
     diff: string;

@@ -28,5 +28,8 @@ test('secure_diff preserves the subprocess service receiver', async (t) => {
   assert.equal(result.passed, true)
   assert.equal(result.filesScanned, 0)
   assert.equal(service.internals.calls.length, 1)
-  assert.deepEqual(service.internals.calls[0].argv, ['git', 'diff', '--no-ext-diff', '--unified=0', 'HEAD'])
+  const argv = service.internals.calls[0].argv
+  assert.deepEqual(argv.slice(0, 2), ['git', 'diff'])
+  assert.ok(argv.includes('--no-ext-diff') && argv.includes('--no-textconv'))
+  assert.deepEqual(argv.slice(-2), ['HEAD', '--'])
 })

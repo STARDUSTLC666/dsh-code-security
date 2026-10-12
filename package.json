@@ -1,6 +1,6 @@
 {
   "name": "dsh-code-security",
-  "version": "0.3.7",
+  "version": "0.3.8",
   "description": "对代码与 Git 改动进行本地静态安全检查，并追踪修复结果。",
   "type": "module",
   "main": "lib/index.js",

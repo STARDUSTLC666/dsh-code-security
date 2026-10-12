@@ -40,7 +40,8 @@ const STATE_FILE = 'state.json'
 const HISTORY_LIMIT = 50
 
 export function findingFingerprint(finding: Finding): string {
-  const raw = finding.ruleId + '|' + finding.file + '|' + finding.snippet.trim()
+  const file = finding.file.split(path.sep).join('/').replace(/^(?:\.\/)+/, '')
+  const raw = finding.ruleId + '|' + file + '|' + finding.snippet.trim()
   return createHash('sha256').update(raw).digest('hex')
 }
 
@@ -148,7 +149,8 @@ export function compareFingerprints(baseline: string[], current: string[]): { cl
 /** 根据已接受基线把发现分为新增与已接受。 */
 export function splitByBaseline(findings: Finding[], baseline: BaselineEntry | null): { fresh: Finding[]; accepted: Finding[] } {
   if (baseline === null) return { fresh: findings, accepted: [] }
-  const acceptedSet = new Set(baseline.fingerprints)
+  // Recompute from saved evidence so older "./file" fingerprints remain usable.
+  const acceptedSet = new Set(baseline.findings.map(findingFingerprint))
   const fresh: Finding[] = []
   const accepted: Finding[] = []
   for (const finding of findings) {
