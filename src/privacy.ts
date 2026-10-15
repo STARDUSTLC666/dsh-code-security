@@ -3,6 +3,15 @@ import { createHash } from 'node:crypto'
 import path from 'node:path'
 import type { Finding } from './scanner.js'
 
+export function isHighEntropyToken(value: string): boolean {
+  if (value.length < 24 || !/\d/.test(value) || /^[0-9]+$/.test(value)) return false
+  const counts = new Map<string, number>()
+  for (const char of value) counts.set(char, (counts.get(char) ?? 0) + 1)
+  let entropy = 0
+  for (const count of counts.values()) { const frequency = count / value.length; entropy -= frequency * Math.log2(frequency) }
+  return entropy >= 3.8
+}
+
 export function evidenceFingerprint(finding: Pick<Finding, 'ruleId' | 'file' | 'snippet'> & { fingerprint?: string }): string {
   if (/^[a-f0-9]{64}$/.test(finding.fingerprint ?? '')) return finding.fingerprint!
   const file = finding.file.split(path.sep).join('/').replace(/^(?:\.\/)+/, '')
@@ -18,6 +27,8 @@ export function redactText(text: string): string {
     .replace(/\b(?:gh[pousr]_[A-Za-z0-9_]{16,}|github_pat_[A-Za-z0-9_]{20,}|sk-(?:proj-)?[A-Za-z0-9_-]{16,}|AKIA[A-Z0-9]{16})\b/g, '[REDACTED]')
     .replace(/(\bBearer\s+)[A-Za-z0-9._~+\/-]{12,}/gi, '$1[REDACTED]')
     .replace(/(https?:\/\/)[^\s/@]+:[^\s/@]+@/g, '$1[REDACTED]@')
+    // A credential must stay redacted when another rule reports the same source line.
+    .replace(/(['"`])([A-Za-z0-9+/=_-]{24,})(?:\1|$)/g, (match, quote: string, value: string) => isHighEntropyToken(value) ? quote + '[REDACTED]' + quote : match)
 }
 
 export function protectFinding(finding: Finding): Finding {

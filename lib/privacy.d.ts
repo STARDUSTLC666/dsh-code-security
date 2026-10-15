@@ -1,4 +1,5 @@
 import type { Finding } from './scanner.js';
+export declare function isHighEntropyToken(value: string): boolean;
 export declare function evidenceFingerprint(finding: Pick<Finding, 'ruleId' | 'file' | 'snippet'> & {
     fingerprint?: string;
 }): string;

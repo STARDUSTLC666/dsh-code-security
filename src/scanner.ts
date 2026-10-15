@@ -10,7 +10,7 @@ import { createHash } from 'node:crypto'
 import { DEFAULT_EXCLUDE_DIRS, type Severity } from './config.js'
 import { languageForFile, RULES, type SecurityRule } from './rules.js'
 import { policyExcludesDir, policyIgnores, type SecurePolicy } from './policy.js'
-import { protectFinding } from './privacy.js'
+import { protectFinding, isHighEntropyToken } from './privacy.js'
 import { sanitizedHtmlLines } from './syntax.js'
 
 export interface Finding {
@@ -88,29 +88,13 @@ function shouldScanFile(file: string): boolean {
   return TEXT_EXTENSIONS.test(file)
 }
 
-/** Shannon 熵；只对 24 位以上且以字母数字为主的 token 判分。 */
-function shannon(text: string): number {
-  if (text.length < 16) return 0
-  const counts = new Map<string, number>()
-  for (const char of text) counts.set(char, (counts.get(char) ?? 0) + 1)
-  let entropy = 0
-  for (const count of counts.values()) {
-    const p = count / text.length
-    entropy -= p * Math.log2(p)
-  }
-  return entropy
-}
-
 const TOKEN_PATTERN = /['"]([A-Za-z0-9+/=_-]{24,})['"]/g
-const HIGH_ENTROPY_THRESHOLD = 3.8
 
 function detectHighEntropy(line: string, lineNumber: number, rel: string, rule: SecurityRule): Finding[] {
   const findings: Finding[] = []
   for (const match of line.matchAll(TOKEN_PATTERN)) {
     const token = match[1]!
-    if (/^[0-9]+$/.test(token)) continue
-    if (!/\d/.test(token)) continue
-    if (shannon(token) < HIGH_ENTROPY_THRESHOLD) continue
+    if (!isHighEntropyToken(token)) continue
     const id = makeId(rule.id, rel, lineNumber, token.slice(0, 32))
     findings.push({
       id,
