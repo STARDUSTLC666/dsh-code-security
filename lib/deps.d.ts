@@ -1,9 +1,4 @@
-/**
- * SBOM-lite：解析常见依赖清单，输出依赖名称、版本约束与风险标记。
- * 只做确定性解析，不联网、不执行包管理器。
- *
- * @module dsh-code-security/deps
- */
+import { type SecurePolicy } from './policy.js';
 export interface DependencyEntry {
     name: string;
     spec: string;
@@ -16,9 +11,20 @@ export interface DependencyEntry {
 export interface DepsScanResult {
     root: string;
     filesScanned: number;
+    filesSkipped: number;
     dependencies: DependencyEntry[];
     riskyCount: number;
     warnings: string[];
+    complete: boolean;
+    lockfiles: string[];
 }
-/** 扫描依赖清单，返回 SBOM-lite 结果。 */
-export declare function scanDeps(root: string): Promise<DepsScanResult>;
+export declare function scanDeps(root: string, options?: {
+    maxFiles?: number;
+    maxFileBytes?: number;
+    signal?: AbortSignal;
+    policy?: SecurePolicy;
+    onDocument?: (document: {
+        file: string;
+        text: string;
+    }) => void;
+}): Promise<DepsScanResult>;

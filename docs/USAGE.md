@@ -1,85 +1,97 @@
-# dsh-code-security 使用说明
+# 代码安全检查使用说明
 
-[返回简介](../README.md) · [更新记录](../CHANGELOG.md) · [验证记录](VALIDATION.md)
+[返回简介](../README.md) · [更新记录](../CHANGELOG.md) · [验证范围](VALIDATION.md)
 
-## 本次改进
+## 从一次修改开始
 
-相对 stateDir 默认在会话工作区的 .code-security。并发扫描保留双方历史；记录损坏时先备份排查，不会默默重建。扫描不跟随符号链接或目录联接；静态规则不能代替完整安全审计。
+在项目聊天中说：“检查当前改动的安全问题，给出证据，修好后再复查。”也可以打开 DSH「设置 → 代码安全」，选择项目后点击「检查代码」或「检查改动」。
 
-0.3.8 改进（2026-10-12）：`secure_diff` 支持 Git 转义的中文/特殊文件名，并检查新增私钥、`.env` 敏感项与禁用审计配置。它读取前后各 3 行上下文以处理已有豁免和跨行配置，只报告证据涉及新增行的问题；跨行证据的行号指向匹配的起始行。暂存扫描以暂存区内容为准。
+工作台登记当前会话的项目目录，不接受浏览器传入任意磁盘路径。项目尚未出现时，先在该项目聊天中运行一次安全检查，再刷新项目。检查可以在关闭面板后继续；取消检查会等待进程退出，不覆盖之前的结果。
 
-全量、直接指定文件与增量扫描均遵守默认目录排除及策略 `exclude`。文件路径统一相对当前会话工作区；在仓库子目录作为工作区时，增量扫描不包含该目录外的改动。返回的 `filesScanned` 为实际审查的文件数，`filesSkipped` 包含排除项；增量结果另有 `filesChanged` 和实际审查的 `addedLines`。
+结果区区分新增和已接受的问题，并显示严重度、置信度、规则、位置、来源及脱敏证据。可筛选高风险问题、复制位置、导出 SARIF/Markdown。打开文件需要先打开对应的项目聊天；否则复制位置即可。
 
-`base` 必须是非空 Git ref，不能以 `-` 开头；`staged` 必须是布尔值。差异块行数不完整或格式错误会报错，本次不会覆盖已有扫描记录。Git 的颜色/前缀偏好不会改变解析格式，外部 diff 和 textconv 转换器被禁用。
+## 选择检查深度
 
-旧记录的 `./` 路径前缀可继续匹配基线。私钥、`.env` 和禁用审计配置现在使用实际匹配片段；旧基线若保存的是文件开头的大段文本，可能被重新识别为新增，需复扫并人工复核后再接受。详见[本轮迭代记录](ITERATION-2026-10-12.md)。
-
-## 工具
-
-| 工具 | 作用 | 写操作 |
+| 引擎 | 检查内容 | 默认行为 |
 | :-- | :-- | :-- |
-| `secure_scan` | 扫描文件/目录，输出 CWE/严重度/行号/代码片段证据 | 写状态 |
-| `secure_diff` | 只审查 git diff 新增行 | 写状态 |
-| `secure_fix_verify` | 修复后复扫：关闭 / 仍存在 / 新引入 | 写状态 |
-| `secure_report` | 按规则/文件聚合 + 门禁结论 | 否 |
-| `secure_export` | 导出 SARIF 2.1.0 / Markdown 报告 | 写文件审批 |
-| `secure_baseline` | 接受当前已知问题为基线，之后只按新增判定 | 审批门 |
-| `secure_deps` | SBOM-lite：解析依赖清单与版本约束风险 | 否 |
-| `secure_policy_show` | 查看 .code-security.json 策略 | 否 |
-| `secure_policy_set` | 写入策略（排除/忽略/阈值） | 审批门 |
+| 内置规则 | 40+ 条注入、反序列化、弱加密、凭据、危险配置、路径与网络模式 | 启用，本地运行 |
+| Betterleaks 1.9.0 | 平台格式与通用密钥规则 | 可选，关闭在线密钥有效性验证 |
+| Semgrep CE 1.181.0 | 本插件自有的 JS/TS 命令、HTML、SQL 与 Python 命令输入传播规则 | 可选，本地运行，关闭指标与版本查询 |
+| OSV-Scanner 2.7.0 | 锁文件中的实际依赖版本与已知漏洞 | 在依赖检查中单独选择 |
 
-## 规则覆盖（40+）
+增强程序由用户安装，不随插件自动下载。在「增强工具与自动检查」填写可执行文件路径，或将程序加入 PATH，保存后点击「检查工具」。设置对当前 DSH profile 生效；自动检查开关按项目保存。只选择需要的引擎，未安装时可继续使用内置规则。
 
-- 注入：eval / exec / shell=True / SQL 拼接 / innerHTML
-- 反序列化：pickle / yaml.load / ObjectInputStream / Marshal / unserialize
-- 加密：弱哈希、ECB、硬编码 IV/密钥、JWT none、TLS 校验关闭、Shell TLS 绕过（curl -k / wget --no-check-certificate / git sslVerify=false）
-- 凭据：硬编码密码、令牌、私钥、高熵密钥
-- 配置：chmod 777、Docker privileged / latest、npm audit=false、CORS *
-- 泄露：敏感日志、错误堆栈外发、路径穿越、SSRF
+扫描状态包含覆盖情况：执行完成、部分完成、未安装、超时、失败、没有可检查文件。选中但失败的引擎不会被当成通过；没有符合该引擎的文件会明确标注未运行。同一位置、同类问题合并展示并保留来源。
 
-发现只包含客观证据与 CWE 编号，不附修复建议——修复方案由 agent 基于证据生成。
+内置 HTML 规则是低置信度的写入点提示。只有可确认词法绑定来自 dompurify 的默认 sanitize 调用才可抑制提示；同名参数、重写方法、额外配置或语法解析失败不会被简单当作安全。Semgrep CE 提供单文件数据流证据，不承诺跨文件分析或漏洞可利用性。
 
-## 安装
+## 依赖清单与漏洞审计
 
-```bash
-dsh plugin --profile web add dsh-code-security
+- **仅列出依赖**：默认离线；解析 npm、PEP 621、Poetry、Python 依赖组、Cargo、Go 等声明，显示固定/范围/浮动版本。清单不是漏洞审计，解析失败和动态依赖会说明。
+- **本地数据库**：通过 OSV 的完全离线模式扫描锁文件。数据库未找到或锁文件无效时显示未完成。
+- **联网审计**：明确选择后，向 OSV 查询包名、实际版本等依赖信息；不上传源代码，不执行包管理器、项目安装脚本或构建脚本。显示漏洞编号、受影响版本和上游列出的修复版本。
+
+推荐提供 package-lock.json、pnpm-lock.yaml、uv.lock 等锁文件；只有版本范围时不能冒充实际安装版本。本地路径包不能当作已查询公共漏洞库。修复版本来自公告，升级前仍需检查兼容性。
+
+OSV 2.7.0 当前实现使用 `缓存目录/osv-scalibr/npm/all.zip`（Python 使用 PyPI）。在工作台填写的是**缓存目录**。可从 OSV 官方漏洞导出桶下载相应生态的 all.zip，或者自行使用 OSV 的数据库下载命令。注意：2.7.0 的源码/Windows 实测路径与其仍写 osv-scanner 的旧离线文档存在差异。自定义目录会同时传给新旧环境变量；本轮实测的是 2.7.0。
+
+「检查工具」显示找到的缓存和文件修改时间。文件时间不是每条漏洞的更新时间；损坏、不完整、过旧数据库的风险不会由一个日期消除。参考 [OSV 离线说明](https://google.github.io/osv-scanner/usage/offline-mode/)和[当前缓存实现](https://github.com/google/osv-scalibr/blob/5be78a00e3c2/enricher/vulnmatch/osvlocal/matcher.go)。
+
+## 安静的自动检查
+
+默认关闭。在项目的增强设置中启用「每轮完成后检查改动」并保存：
+
+1. 主会话一轮结束后，合并等待约 1.8 秒再检查；新一轮开始会取消旧检查。
+2. 只用内置规则检查本地 Git 改动和未跟踪的新文件，不运行模型或外部扫描程序。
+3. 只把未被手动基线接受的新增高风险模式，作为证据提供给后续对话提示。没有弹窗，也不会自动修改代码或接受基线。
+4. 结果放在独立的 automatic 目录，保留手动增强扫描和复查记录。非 Git 项目或检查失败会在设置中提示手动核对。
+
+它不是定时监控，也不会在 DSH 关闭后运行。提醒发生在后续对话中，不是主动发起一轮新对话。
+
+## 工具参数
+
+| 工具 | 主要参数与用途 | 写入 |
+| :-- | :-- | :-- |
+| secure_scan | target 可选；engines 可选数组 | 本地状态 |
+| secure_diff | base 默认 HEAD；staged；target；includeUntracked 默认 false；engines | 本地状态 |
+| secure_fix_verify | 沿用上次范围与引擎，不能用缩小范围伪称修复 | 完整复查后更新状态 |
+| secure_report | 最近结果、新增/已接受、覆盖情况 | 无 |
+| secure_export | format 为 sarif/markdown；path 可选 | 提供 path 时需审批 |
+| secure_baseline | reason 必填，接受当前全部问题 | 需审批 |
+| secure_deps | target；audit 为 none/offline/online | 临时快照 |
+| secure_policy_show | 查看项目策略 | 无 |
+| secure_policy_set | policy 为完整 JSON | 需审批 |
+| secure_health | 工具版本、检查设置和缓存信息 | 无 |
+
+```json
+{"target":"src","engines":["builtin","betterleaks","semgrep"]}
 ```
 
-## 卸载
+以上是 secure_scan 的参数。secure_fix_verify 默认使用上次的 target、Git base、暂存模式和引擎；检查失败时不判定旧问题已修复。规则不再命中与实际功能测试通过是两项不同证据。
 
-```bash
-dsh plugin --profile web remove dsh-code-security
-```
+升级前的增量记录未保存完整范围，需先重新执行 secure_diff，之后才能按原范围复查。
 
-卸载后重启 Web 服务。如需彻底清理，可再手动删除自己 profile `cordis.patch.yml` 中覆盖的插件行。
+## 范围、策略和记录
 
-## 使用
+默认跳过 node_modules、.git、构建目录和 .code-security，也不跟随符号链接/目录联接。默认文件上限 5000、每文件 2 MiB；增强快照总量最多 64 MiB。超过限制、无法读取或格式无效时明确显示不完整。当前检查工作区或指定 Git 差异，不遍历所有 Git 历史提交。
 
-```text
-secure_scan { target: src }
-secure_diff { base: HEAD }
-secure_fix_verify { target: src }
-secure_baseline { reason: 历史遗留 }
-secure_deps { target: . }
-```
+相对 stateDir 默认位于当前会话项目的 .code-security。并发写入使用锁与原子替换；记录损坏时保留原文件并报错。旧记录、历史和基线读取时会迁移为脱敏证据，并保留基于原始证据计算的指纹。不会向模型或报告返回完整检测到的密钥。
 
-策略示例（`.code-security.json`）：
+策略文件 `.code-security.json`：
 
 ```json
 {
   "version": 1,
   "exclude": ["vendor/**", "generated/**"],
-  "ignore": [{ "ruleId": "SEC-206", "file": "test/**", "reason": "非安全敏感" }],
+  "ignore": [{"ruleId":"SEC-206","file":"test/**","reason":"非安全敏感"}],
   "failOn": "high"
 }
 ```
 
-## 工程
+Git 输出禁用外部 diff/textconv，路径相对当前会话工作区。暂存检查读取 Git index；新增行才计入差异发现。错写参数、无效 Git ref 或不完整 diff 不会覆盖已有记录。
 
-```bash
-pnpm test       # 构建并执行测试
-```
+## 开发与许可
 
-## License
+`pnpm test` 构建并测试；未指定原生程序路径时，三项原生引擎集成测试明确跳过。CI 另有 Windows/Linux 原生引擎任务，使用固定版本、校验下载摘要和合成离线漏洞库。
 
-MIT（见 [LICENSE](../LICENSE)）
+插件和自有规则采用 [MIT](../LICENSE)。第三方程序未打包进插件，其许可和规则限制见 [第三方说明](../THIRD_PARTY_NOTICES.md)。静态检查提供可复核线索，不能替代项目测试或完整安全审计。

@@ -6,6 +6,11 @@
 import { type Severity } from './config.js';
 import { type SecurePolicy } from './policy.js';
 export interface Finding {
+    endLine?: number;
+    fingerprint?: string;
+    engine?: 'builtin' | 'betterleaks' | 'semgrep';
+    evidence?: 'pattern' | 'dataflow';
+    sources?: string[];
     id: string;
     ruleId: string;
     title: string;
@@ -18,6 +23,8 @@ export interface Finding {
     message: string;
 }
 export interface ScanResult {
+    complete: boolean;
+    warnings: string[];
     root: string;
     filesScanned: number;
     filesSkipped: number;
@@ -25,6 +32,10 @@ export interface ScanResult {
     durationMs: number;
 }
 export interface ScanOptions {
+    onDocument?: (document: {
+        file: string;
+        text: string;
+    }) => void;
     cwd: string;
     target?: string;
     maxFiles: number;
@@ -37,7 +48,7 @@ export interface LineEntry {
     text: string;
 }
 /** 对带行号的文本行应用规则（全量扫描与 git diff 增量扫描共用）。 */
-export declare function scanLineSet(entries: LineEntry[], rel: string, policy: SecurePolicy, selectedLines?: ReadonlySet<number>): Finding[];
+export declare function scanLineSet(entries: LineEntry[], rel: string, policy: SecurePolicy, selectedLines?: ReadonlySet<number>, sanitized?: ReadonlySet<number>): Finding[];
 /** 扫描单个文件内容，按语言与行应用规则。 */
 export declare function scanText(content: string, file: string, rel: string, policy: SecurePolicy): Finding[];
 /** Apply the same exclusions to full scans, directly selected files and diffs. */

@@ -27,4 +27,6 @@ export interface SecureToolDefinition {
     execute(args: unknown, exec: unknown): Promise<unknown>;
     timeoutMs?: number;
 }
+/** Reject ambiguous scopes before reading files, running git, or replacing scan state. */
+export declare function scanArguments(raw: unknown, allowed?: readonly string[]): Record<string, unknown>;
 export declare function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner: ProcessRunner): SecureToolDefinition[];

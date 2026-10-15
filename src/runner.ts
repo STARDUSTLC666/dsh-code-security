@@ -12,14 +12,14 @@ export interface RunResult {
 }
 
 export interface ProcessRunner {
-  run(argv: readonly string[], options?: { timeoutMs?: number; cwd?: string; signal?: AbortSignal }): Promise<RunResult>
+  run(argv: readonly string[], options?: { timeoutMs?: number; cwd?: string; signal?: AbortSignal; env?: Record<string, string> }): Promise<RunResult>
 }
 
 export interface SubprocessHandleLike {
   done: Promise<{ exitCode: number | null; signal: string | null }>
   collected: {
-    stdout?: { readFrom(offset: number): { text: string } }
-    stderr?: { readFrom(offset: number): { text: string } }
+    stdout?: { readFrom(offset: number): { text: string; lossy?: boolean } }
+    stderr?: { readFrom(offset: number): { text: string; lossy?: boolean } }
   }
   terminate(): void
 }
@@ -31,6 +31,7 @@ export interface SubprocessSpawnLike {
     stdio: { stdin: 'ignore'; stdout: { maxBytes: number }; stderr: { maxBytes: number } }
     graceMs: number
     signal?: AbortSignal
+    env?: Record<string, string>
   }): SubprocessHandleLike
 }
 
@@ -43,7 +44,7 @@ export function createSubprocessRunner(spawn: SubprocessSpawnLike, graceMs: numb
       const controller = new AbortController()
       const signal = options?.signal ? AbortSignal.any([options.signal, controller.signal]) : controller.signal
       signal.throwIfAborted()
-      const timer = setTimeout(() => controller.abort(new Error('git diff timed out')), timeoutMs)
+      const timer = setTimeout(() => controller.abort(new Error('scanner subprocess timed out')), timeoutMs)
       try {
         const handle = spawn({
           argv,
@@ -51,13 +52,17 @@ export function createSubprocessRunner(spawn: SubprocessSpawnLike, graceMs: numb
           stdio: { stdin: 'ignore', stdout: { maxBytes: COLLECT_BYTES }, stderr: { maxBytes: COLLECT_BYTES } },
           graceMs,
           signal,
+          ...(options?.env ? { env: options.env } : {}),
         })
         const outcome = await handle.done
+        signal.throwIfAborted()
+        const stdout = handle.collected.stdout?.readFrom(0), stderr = handle.collected.stderr?.readFrom(0)
+        if (stdout?.lossy || stderr?.lossy) throw new Error('scanner subprocess output exceeded 8 MiB; this check is incomplete')
         return {
           exitCode: outcome.exitCode,
           signal: outcome.signal,
-          stdout: handle.collected.stdout?.readFrom(0).text ?? '',
-          stderr: handle.collected.stderr?.readFrom(0).text ?? '',
+          stdout: stdout?.text ?? '',
+          stderr: stderr?.text ?? '',
         }
       } finally {
         clearTimeout(timer)

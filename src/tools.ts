@@ -19,6 +19,8 @@ import { ruleCategory } from './rules.js'
 import type { ProcessRunner } from './runner.js'
 import { scanPath, type Finding } from './scanner.js'
 import { compareFingerprints, countFindings, findingFingerprint, loadState, saveBaseline, saveState, splitByBaseline } from './state.js'
+import { runSourceCheck, sourceEngines } from './audit.js'
+import { probeEngine, databaseHealth } from './engines.js'
 
 export interface ContentBlock {
   type: 'text'
@@ -46,13 +48,14 @@ function compileParameters(spec: Record<string, any>): { type: 'object'; propert
     if (typeof prop?.type === 'string') node.type = prop.type
     if (typeof prop?.description === 'string') node.description = prop.description
     if (prop?.enum !== undefined) node.enum = prop.enum
+    if (prop?.items !== undefined) node.items = prop.items
     properties[key] = node
   }
   return { type: 'object', properties, ...(required.length > 0 ? { required } : {}) }
 }
 
 /** Reject ambiguous scopes before reading files, running git, or replacing scan state. */
-function scanArguments(raw: unknown, allowed: readonly string[] = ['target']): Record<string, unknown> {
+export function scanArguments(raw: unknown, allowed: readonly string[] = ['target', 'engines']): Record<string, unknown> {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
     throw new Error('扫描参数必须是对象。请用 { target: "文件或目录" } 限定范围；扫描整个工作区请传 {}。')
   }
@@ -70,6 +73,7 @@ function scanArguments(raw: unknown, allowed: readonly string[] = ['target']): R
   if (Object.hasOwn(args, 'staged') && typeof args.staged !== 'boolean') {
     throw new Error('扫描参数 staged 必须是布尔值 true 或 false。')
   }
+  if (Object.hasOwn(args, 'includeUntracked') && typeof args.includeUntracked !== 'boolean') throw new Error('includeUntracked 必须是布尔值')
   return args
 }
 
@@ -139,7 +143,7 @@ export function buildSecureTools(cfg: ResolvedSecureConfig, cwd: string, runner:
     signal?.throwIfAborted()
     const workspace = context?.agent?.session?.header?.cwd || cwd
     const resolved = { ...cfg, stateDir: cfg.stateDirRelative ? path.resolve(workspace, cfg.stateDirRelative) : cfg.stateDir }
-    const scopedRunner: ProcessRunner = { run: (argv, options) => runner.run(argv, { ...options, cwd: workspace, signal }) }
+    const scopedRunner: ProcessRunner = { run: (argv, options) => runner.run(argv, { ...options, cwd: options?.cwd ?? workspace, signal: options?.signal && signal ? AbortSignal.any([options.signal, signal]) : options?.signal ?? signal }) }
     const selected = buildWorkspaceTools(resolved, workspace, scopedRunner, signal).find(row => row.name === tool.name)!
     return selected.execute(args, exec)
   } }))
@@ -153,6 +157,7 @@ function buildWorkspaceTools(cfg: ResolvedSecureConfig, cwd: string, runner: Pro
     description: '扫描工作区（或指定文件/目录），用确定性规则检测注入、弱加密、硬编码密钥、危险配置等问题。使用 target 字符串限定范围，不接受 paths/files 等参数；{} 表示整个工作区。结果写入 .code-security 状态供 secure_fix_verify 对比。',
     parameters: { ...compileParameters({
       target: { type: 'string', description: '要扫描的文件或目录（可选，缺省扫描整个工作区）。' },
+      engines: { type: 'array', items: { type: 'string', enum: ['builtin','betterleaks','semgrep'] }, description: '可选引擎，默认使用配置（初始仅 builtin）。' },
     }), additionalProperties: false },
     output: { schema: scanSchema, render: renderFindings },
     async execute(rawArgs: unknown) {
@@ -160,7 +165,8 @@ function buildWorkspaceTools(cfg: ResolvedSecureConfig, cwd: string, runner: Pro
       const target = optionalString(args, 'target')
       const policy = await loadPolicy(cwd)
       const failOn = policy.failOn ?? cfg.failOn
-      const result = await scanPath({ cwd, target, maxFiles: cfg.maxFiles, maxFileBytes: cfg.maxFileBytes, policy, signal })
+      const engines = sourceEngines(args.engines, cfg.engines)
+      const result = await runSourceCheck({ kind: 'scan', ...(target ? { target } : {}) }, cfg, cwd, runner, engines, policy, signal)
       const state = await loadState(stateDir)
       const counts = countFindings(result.findings)
       const split = splitByBaseline(result.findings, state.baseline)
@@ -172,9 +178,10 @@ function buildWorkspaceTools(cfg: ResolvedSecureConfig, cwd: string, runner: Pro
         findings: result.findings,
         fingerprints: result.findings.map(findingFingerprint),
         counts,
+        complete: result.complete, coverage: result.coverage, engines, scope: result.scope,
       }
       const stateFile = await saveState(stateDir, entry, signal)
-      return { ...result, counts, newFindings: split.fresh, newCounts: countFindings(split.fresh), acceptedFindings: split.accepted, baseline: state.baseline, passed: verdictOf(split.fresh, failOn), failOn, stateFile }
+      return { ...result, counts, newFindings: split.fresh, newCounts: countFindings(split.fresh), acceptedFindings: split.accepted, baseline: state.baseline, passed: result.complete && verdictOf(split.fresh, failOn), failOn, stateFile }
     },
     timeoutMs: 120000,
   }
@@ -186,16 +193,18 @@ function buildWorkspaceTools(cfg: ResolvedSecureConfig, cwd: string, runner: Pro
       base: { type: 'string', description: 'git 基线（默认 HEAD）。' },
       target: { type: 'string', description: '限定文件路径（可选）。' },
       staged: { type: 'boolean', description: '审查已暂存改动（git diff --cached，默认 false）。' },
+      includeUntracked: { type: 'boolean', description: '同时检查未跟踪的新文件（默认 false，staged 模式不包含它们）。' },
+      engines: { type: 'array', items: { type: 'string', enum: ['builtin','betterleaks','semgrep'] }, description: '可选增强引擎；同样只报告涉及新增行的问题。' },
     }), additionalProperties: false },
     output: { schema: scanSchema, render: renderFindings },
     async execute(rawArgs: unknown) {
-      const args = scanArguments(rawArgs, ['base', 'target', 'staged'])
+      const args = scanArguments(rawArgs, ['base', 'target', 'staged', 'engines', 'includeUntracked'])
       const base = optionalString(args, 'base') ?? 'HEAD'
       const target = optionalString(args, 'target')
       const policy = await loadPolicy(cwd)
       const failOn = policy.failOn ?? cfg.failOn
-      const diff = await runGitDiff(runner, cwd, base, target, 30000, args.staged === true)
-      const result = scanDiff(diff, cwd, policy)
+      const engines = sourceEngines(args.engines, cfg.engines)
+      const result = await runSourceCheck({ kind: 'diff', base, staged: args.staged === true, ...(args.includeUntracked === true ? { includeUntracked: true } : {}), ...(target ? { target } : {}) }, cfg, cwd, runner, engines, policy, signal)
       const state = await loadState(stateDir)
       const counts = countFindings(result.findings)
       const split = splitByBaseline(result.findings, state.baseline)
@@ -207,18 +216,20 @@ function buildWorkspaceTools(cfg: ResolvedSecureConfig, cwd: string, runner: Pro
         findings: result.findings,
         fingerprints: result.findings.map(findingFingerprint),
         counts,
+        complete: result.complete, coverage: result.coverage, engines, scope: result.scope,
       }
       await saveState(stateDir, entry, signal)
-      return { root: base, filesChanged: result.filesChanged, filesScanned: result.filesScanned, filesSkipped: result.filesSkipped, addedLines: result.addedLines, findings: result.findings, counts, newFindings: split.fresh, newCounts: countFindings(split.fresh), acceptedFindings: split.accepted, baseline: state.baseline, passed: verdictOf(split.fresh, failOn), failOn, durationMs: 0 }
+      return { ...result, counts, newFindings: split.fresh, newCounts: countFindings(split.fresh), acceptedFindings: split.accepted, baseline: state.baseline, passed: result.complete && verdictOf(split.fresh, failOn), failOn }
     },
     timeoutMs: 60000,
   }
 
   const secureFixVerify: SecureToolDefinition = {
     name: 'secure_fix_verify',
-    description: '复扫并与上次扫描基线对比，输出已关闭、仍存在、新引入的问题指纹。用于修复后确认没有按下葫芦浮起瓢。',
+    description: '按上次相同范围与引擎复查，输出已关闭、仍存在、新增问题。只有完整复查才更新状态和判定关闭；规则不再命中不等同于相关测试通过。',
     parameters: { ...compileParameters({
       target: { type: 'string', description: '复扫文件或目录（可选，缺省扫描整个工作区）。' },
+      engines: { type: 'array', items: { type: 'string', enum: ['builtin','betterleaks','semgrep'] }, description: '默认沿用上次扫描引擎；需与上次相同，避免未执行就宣称修好。' },
     }), additionalProperties: false },
     output: {
       schema: {
@@ -241,24 +252,37 @@ function buildWorkspaceTools(cfg: ResolvedSecureConfig, cwd: string, runner: Pro
       const target = optionalString(args, 'target')
       const policy = await loadPolicy(cwd)
       const state = await loadState(stateDir)
-      const result = await scanPath({ cwd, target, maxFiles: cfg.maxFiles, maxFileBytes: cfg.maxFileBytes, policy, signal })
+      const engines = sourceEngines(args.engines, state.last?.engines ?? cfg.engines)
+      if (state.last && !state.last.scope && state.last.mode.startsWith('diff:')) throw new Error('旧版增量记录缺少完整范围，请先重新执行 secure_diff / Rerun secure_diff to upgrade this legacy diff record before rechecking')
+      const scope = state.last?.scope ?? { kind: 'scan' as const, ...(state.last?.target && state.last.target !== '.' ? { target: state.last.target } : {}) }
+      if (target !== undefined && path.resolve(cwd, target) !== path.resolve(cwd, scope.target ?? '.')) throw new Error('复查范围必须与上次扫描相同；请先对新范围执行 secure_scan')
+      if (state.last?.engines && [...engines].sort().join() !== [...state.last.engines].sort().join()) throw new Error('复查引擎必须与上次扫描相同')
+      const result = await runSourceCheck(scope, cfg, cwd, runner, engines, policy, signal)
       if (state.last === null) {
         return { baselineMissing: true, baselineTime: '', closedCount: 0, remainingCount: 0, freshCount: result.findings.length, closed: [], remaining: [], fresh: result.findings, passed: false }
       }
       const current = result.findings.map(findingFingerprint)
       const cmp = compareFingerprints(state.last.findings.map(findingFingerprint), current)
       const byFingerprint = new Map(result.findings.map((finding) => [findingFingerprint(finding), finding]))
-      const closed = cmp.closed.map((fp) => state.last!.findings.find((finding) => findingFingerprint(finding) === fp)).filter((x): x is Finding => x !== undefined)
+      const closed = result.complete ? cmp.closed.map((fp) => state.last!.findings.find((finding) => findingFingerprint(finding) === fp)).filter((x): x is Finding => x !== undefined) : []
       const remaining = cmp.remaining.map((fp) => byFingerprint.get(fp)).filter((x): x is Finding => x !== undefined)
       const fresh = cmp.fresh.map((fp) => byFingerprint.get(fp)).filter((x): x is Finding => x !== undefined)
+      if (result.complete) await saveState(stateDir, {
+        ...state.last, time: new Date().toISOString(), mode: 'verify:' + scope.kind,
+        filesScanned: result.filesScanned, findings: result.findings,
+        fingerprints: current, counts: countFindings(result.findings),
+        complete: true, coverage: result.coverage, engines, scope,
+      }, signal)
       return {
         baselineMissing: false,
         baselineTime: state.last.time,
         closedCount: closed.length,
         remainingCount: remaining.length,
         freshCount: fresh.length,
+        complete: result.complete, coverage: result.coverage,
+        unverified: result.complete ? [] : state.last.findings,
         closed, remaining, fresh,
-        passed: fresh.length === 0 && remaining.length === 0,
+        passed: result.complete && fresh.length === 0 && remaining.length === 0,
       }
     },
     timeoutMs: 120000,
@@ -301,6 +325,7 @@ function buildWorkspaceTools(cfg: ResolvedSecureConfig, cwd: string, runner: Pro
       const split = splitByBaseline(last.findings, state.baseline)
       return {
         hasScan: true,
+        time: last.time, scope: last.scope, engines: last.engines ?? ['builtin'],
         stateFile: stateDir,
         policy,
         counts: last.counts,
@@ -309,7 +334,9 @@ function buildWorkspaceTools(cfg: ResolvedSecureConfig, cwd: string, runner: Pro
         acceptedCounts: countFindings(split.accepted),
         byRule: [...byRule.entries()].sort((a, b) => b[1] - a[1]).map(([rule, count]) => ({ rule, count, category: ruleCategory(rule) })),
         byFile: [...byFile.entries()].sort((a, b) => b[1] - a[1]).slice(0, 50).map(([file, count]) => ({ file, count })),
-        passed: verdictOf(split.fresh, failOn),
+        passed: last.complete !== false && verdictOf(split.fresh, failOn),
+        complete: last.complete !== false, coverage: last.coverage ?? [], findings: last.findings,
+        newFindings: split.fresh, acceptedFindings: split.accepted,
         historyCount: state.history.length,
       }
     },
@@ -389,8 +416,9 @@ function buildWorkspaceTools(cfg: ResolvedSecureConfig, cwd: string, runner: Pro
       if (state.last === null) throw new Error('尚无扫描结果，请先执行 secure_scan 或 secure_diff。')
       const text = format === 'sarif' ? buildSarif(state.last.findings, cwd) : buildMarkdown(state.last.findings, state.last.target)
       signal?.throwIfAborted()
-      if (target !== undefined) await writeFile(target, text, 'utf8')
-      return { format, path: target ?? '', text, findingCount: state.last.findings.length }
+      const destination = target === undefined ? undefined : path.resolve(cwd, target)
+      if (destination !== undefined) await writeFile(destination, text, { encoding: 'utf8', mode: 0o600, signal })
+      return { format, path: destination ?? '', text, findingCount: state.last.findings.length }
     },
     timeoutMs: 30000,
   }
@@ -418,11 +446,12 @@ function buildWorkspaceTools(cfg: ResolvedSecureConfig, cwd: string, runner: Pro
       checks.push({ name: '严重度门禁', ok: true, detail: 'failOn=' + cfg.failOn })
       checks.push({ name: '状态目录', ok: true, detail: cfg.stateDir })
       checks.push({ name: '工作目录', ok: cwd !== '', detail: cwd })
-      return { ok: true, plugin: 'dsh-code-security', checks }
+      const engines = await Promise.all((['osv','betterleaks','semgrep'] as const).map(engine => probeEngine(engine, cfg, runner)))
+      return { ok: true, plugin: 'dsh-code-security', checks, engines, configuredEngines: cfg.engines, database: await databaseHealth(cfg) }
     },
   }
 
-  return [secureScan, secureDiff, secureFixVerify, secureReport, secureExport, ...buildExtraTools(cfg, cwd, signal), policyShow, policySet, secureHealth]
+  return [secureScan, secureDiff, secureFixVerify, secureReport, secureExport, ...buildExtraTools(cfg, cwd, signal, runner), policyShow, policySet, secureHealth]
 }
 
 function buildMarkdown(findings: Finding[], target: string): string {

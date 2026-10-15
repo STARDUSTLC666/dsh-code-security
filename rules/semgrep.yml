@@ -1,0 +1,72 @@
+# Original rules for this plugin (MIT). No Semgrep-maintained registry rules bundled.
+rules:
+  - id: dsh-js-command-input
+    languages: [javascript, typescript]
+    mode: taint
+    message: Request input flows into a shell command argument. Review quoting and use argument arrays.
+    severity: ERROR
+    metadata: {cwe: [CWE-78], confidence: MEDIUM}
+    pattern-sources:
+      - pattern-either:
+          - pattern: $REQ.query
+          - pattern: $REQ.body
+          - pattern: $REQ.params
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: exec($CMD, ...)
+              - pattern: execSync($CMD, ...)
+              - pattern: $CP.exec($CMD, ...)
+              - pattern: $CP.execSync($CMD, ...)
+          - focus-metavariable: $CMD
+  - id: dsh-js-html-input
+    languages: [javascript, typescript]
+    mode: taint
+    message: Request input flows into an HTML insertion point without a recognized sanitizer.
+    severity: ERROR
+    metadata: {cwe: [CWE-79], confidence: MEDIUM}
+    pattern-sources:
+      - pattern-either:
+          - pattern: $REQ.query
+          - pattern: $REQ.body
+          - pattern: $REQ.params
+    pattern-sinks:
+      - patterns:
+          - pattern: $EL.innerHTML = $HTML
+          - focus-metavariable: $HTML
+  - id: dsh-js-sql-input
+    languages: [javascript, typescript]
+    mode: taint
+    message: Request input flows into SQL text. Parameterized values are separate from SQL text.
+    severity: ERROR
+    metadata: {cwe: [CWE-89], confidence: MEDIUM}
+    pattern-sources:
+      - pattern-either:
+          - pattern: $REQ.query
+          - pattern: $REQ.body
+          - pattern: $REQ.params
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: $DB.query($SQL, ...)
+              - pattern: $DB.execute($SQL, ...)
+          - focus-metavariable: $SQL
+  - id: dsh-python-command-input
+    languages: [python]
+    mode: taint
+    message: Request input flows into a shell command argument.
+    severity: ERROR
+    metadata: {cwe: [CWE-78], confidence: MEDIUM}
+    pattern-sources:
+      - pattern-either:
+          - pattern: request.args
+          - pattern: request.form
+          - pattern: request.GET
+          - pattern: request.POST
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: os.system($CMD)
+              - pattern: subprocess.run($CMD, ..., shell=True, ...)
+              - pattern: subprocess.call($CMD, ..., shell=True, ...)
+          - focus-metavariable: $CMD

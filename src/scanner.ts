@@ -10,8 +10,15 @@ import { createHash } from 'node:crypto'
 import { DEFAULT_EXCLUDE_DIRS, type Severity } from './config.js'
 import { languageForFile, RULES, type SecurityRule } from './rules.js'
 import { policyExcludesDir, policyIgnores, type SecurePolicy } from './policy.js'
+import { protectFinding } from './privacy.js'
+import { sanitizedHtmlLines } from './syntax.js'
 
 export interface Finding {
+  endLine?: number
+  fingerprint?: string
+  engine?: 'builtin' | 'betterleaks' | 'semgrep'
+  evidence?: 'pattern' | 'dataflow'
+  sources?: string[]
   id: string
   ruleId: string
   title: string
@@ -25,6 +32,8 @@ export interface Finding {
 }
 
 export interface ScanResult {
+  complete: boolean
+  warnings: string[]
   root: string
   filesScanned: number
   filesSkipped: number
@@ -33,6 +42,7 @@ export interface ScanResult {
 }
 
 export interface ScanOptions {
+  onDocument?: (document: { file: string; text: string }) => void
   cwd: string
   target?: string
   maxFiles: number
@@ -167,7 +177,7 @@ function scanFileRule(entries: LineEntry[], rel: string, rule: SecurityRule, dis
 }
 
 /** 对带行号的文本行应用规则（全量扫描与 git diff 增量扫描共用）。 */
-export function scanLineSet(entries: LineEntry[], rel: string, policy: SecurePolicy, selectedLines?: ReadonlySet<number>): Finding[] {
+export function scanLineSet(entries: LineEntry[], rel: string, policy: SecurePolicy, selectedLines?: ReadonlySet<number>, sanitized: ReadonlySet<number> = new Set()): Finding[] {
   const language = languageForFile(rel)
   const findings: Finding[] = []
   const applied = RULES.filter((rule) => (rule.languages.includes(language) || rule.languages.includes('any')) && !policyIgnores(policy, rule.id, rel))
@@ -182,6 +192,7 @@ export function scanLineSet(entries: LineEntry[], rel: string, policy: SecurePol
     const currentDisable = isCommentLine ? disabledRules(entry.text, DISABLE_LINE) : null
     for (const rule of applied) {
       if (rule.id === 'SEC-304') continue
+      if (rule.id === 'SEC-009' && sanitized.has(entry.line)) continue
       if (shouldSkipLine(rule, currentDisable) || shouldSkipLine(rule, prevDisable.get(entry.line))) continue
       if (rule.fileLevel === true) continue
       if (isCommentLine) continue
@@ -208,7 +219,7 @@ export function scanLineSet(entries: LineEntry[], rel: string, policy: SecurePol
     const finding = scanFileRule(entries, rel, rule, prevDisable, selectedLines)
     if (finding !== undefined) findings.push(finding)
   }
-  return findings
+  return findings.map(finding => protectFinding({ ...finding, engine: 'builtin', evidence: 'pattern' }))
 }
 
 /** 扫描单个文件内容，按语言与行应用规则。 */
@@ -217,7 +228,7 @@ export function scanText(content: string, file: string, rel: string, policy: Sec
   const entries: LineEntry[] = lines.map((text, index) => ({ line: index + 1, text }))
   // Match file rules over contiguous lines, sharing locations and suppressions
   // with incremental scans without joining unrelated diff hunks.
-  return scanLineSet(entries, rel, policy)
+  return scanLineSet(entries, rel, policy, undefined, languageForFile(rel) === 'javascript' ? sanitizedHtmlLines(content) : new Set())
 }
 
 /** Apply the same exclusions to full scans, directly selected files and diffs. */
@@ -234,6 +245,9 @@ export async function scanPath(options: ScanOptions): Promise<ScanResult> {
   let filesSkipped = 0
   const findings: Finding[] = []
   const relRoot = path.relative(cwd, root).split(path.sep).join('/')
+  let complete = true
+  const warnings: string[] = []
+  const incomplete = (message: string) => { complete = false; if (warnings.length < 50) warnings.push(message) }
 
   const visit = async (absolute: string, rel: string): Promise<void> => {
     options.signal?.throwIfAborted()
@@ -246,10 +260,11 @@ export async function scanPath(options: ScanOptions): Promise<ScanResult> {
       stat = await fs.lstat(absolute)
     } catch {
       filesSkipped += 1
+      incomplete('无法读取 ' + rel)
       return
     }
     options.signal?.throwIfAborted()
-    if (stat.isSymbolicLink()) { filesSkipped += 1; return }
+    if (stat.isSymbolicLink()) { filesSkipped += 1; if (absolute === root) incomplete('目标为链接，未读取链接内容'); return }
     if (stat.isDirectory()) {
       if (DEFAULT_EXCLUDE_DIRS.includes(path.basename(absolute))) return
       let entries
@@ -257,10 +272,11 @@ export async function scanPath(options: ScanOptions): Promise<ScanResult> {
         entries = await fs.readdir(absolute, { withFileTypes: true })
       } catch {
         filesSkipped += 1
+        incomplete('无法遍历 ' + rel)
         return
       }
       for (const entry of entries) {
-        if (filesScanned >= maxFiles) return
+        if (filesScanned >= maxFiles) { incomplete('已达到文件数量上限'); return }
         await visit(path.join(absolute, entry.name), rel === '' ? entry.name : rel + '/' + entry.name)
       }
       return
@@ -271,6 +287,7 @@ export async function scanPath(options: ScanOptions): Promise<ScanResult> {
     }
     if (stat.size > maxFileBytes) {
       filesSkipped += 1
+      incomplete(rel + ' 超过文件大小上限')
       return
     }
     let buffer: Uint8Array
@@ -278,6 +295,7 @@ export async function scanPath(options: ScanOptions): Promise<ScanResult> {
       buffer = new Uint8Array(await fs.readFile(absolute))
     } catch {
       filesSkipped += 1
+      incomplete('无法读取 ' + rel)
       return
     }
     if (fileHasBinary(buffer)) {
@@ -287,12 +305,13 @@ export async function scanPath(options: ScanOptions): Promise<ScanResult> {
     filesScanned += 1
     options.signal?.throwIfAborted()
     const text = new TextDecoder('utf-8', { fatal: false }).decode(buffer)
+    options.onDocument?.({ file: rel, text })
     findings.push(...scanText(text, absolute, rel, policy))
   }
 
   await visit(root, relRoot)
   findings.sort((a, b) => severityRank(b.severity) - severityRank(a.severity) || a.file.localeCompare(b.file) || a.line - b.line)
-  return { root, filesScanned, filesSkipped, findings, durationMs: Date.now() - started }
+  return { root, filesScanned, filesSkipped, findings, durationMs: Date.now() - started, complete, warnings }
 }
 
 function severityRank(severity: Severity): number {

@@ -14,10 +14,9 @@ test('git diff timeout remains active until the subprocess settles', async () =>
       terminate() {},
     }
   }, 1000, 20)
-  const result = await runner.run(['git', 'diff'])
+  await assert.rejects(runner.run(['git', 'diff']), /timed out/)
   assert.equal(signal.aborted, true)
   assert.match(signal.reason.message, /timed out/)
-  assert.deepEqual(result, { exitCode: null, signal: 'SIGTERM', stdout: '', stderr: 'partial stderr' })
 })
 
 test('settled and failed subprocesses release their timeout', async () => {
@@ -37,5 +36,12 @@ test('settled and failed subprocesses release their timeout', async () => {
     else await assert.rejects(runner.run(['git', 'diff']), (error) => error === failure)
     await new Promise((resolve) => setTimeout(resolve, 40))
     assert.equal(signal.aborted, false, outcome)
+  }
+})
+
+test('a lossy DSH output tail is never parsed as a complete Git or scanner response', async () => {
+  for (const stream of ['stdout','stderr']) {
+    const runner = createSubprocessRunner(() => ({ done: Promise.resolve({ exitCode: 0, signal: null }), collected: { [stream]: { readFrom: () => ({ text: '{}', lossy: true }) } }, terminate() {} }), 1000, 1000)
+    await assert.rejects(runner.run(['fixture']), /output exceeded 8 MiB/)
   }
 })

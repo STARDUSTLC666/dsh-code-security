@@ -5,7 +5,14 @@
  * @module dsh-code-security/state
  */
 import type { Finding } from './scanner.js';
+import type { SourceEngine } from './config.js';
+import type { EngineCoverage } from './engines.js';
+import type { ScanScope } from './audit.js';
 export interface ScanStateEntry {
+    complete?: boolean;
+    coverage?: EngineCoverage[];
+    engines?: SourceEngine[];
+    scope?: ScanScope;
     mode: string;
     target: string;
     time: string;

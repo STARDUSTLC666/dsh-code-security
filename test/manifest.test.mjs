@@ -11,6 +11,8 @@ test('manifest 字段', () => {
   assert.match(pkg.version, /^\d+\.\d+\.\d+$/)
   assert.equal(pkg.dsh.bundle.patch, './cordis.patch.yml')
   assert.ok(pkg.files.includes('lib'))
+  assert.equal(pkg.exports['./client'], './lib/client.js')
+  assert.ok(pkg.dsh.client.inject.includes('@deepseek-ai/dsh-client-ui-settings'))
   assert.ok(existsSync(new URL('../cordis.patch.yml', import.meta.url)))
 })
 
@@ -40,4 +42,13 @@ test('apply 注册 10 个工具、挂载 alpha.4 pre-execute 审批门并 dispos
   listeners.dispose()
   assert.equal(names.length, 0)
   assert.deepEqual(inject, ['tools', 'subprocess'])
+})
+
+test('invalid plugin configuration keeps DSH loadable but cannot silently pass a fallback scan', async () => {
+  const definitions = []; let calls = 0
+  apply({ tools: { register(def) { definitions.push(def); return () => {} } }, subprocess: { spawn() { calls++; throw new Error('fixture executable missing') } } }, { engines: ['unknown'] })
+  await assert.rejects(definitions.find(t => t.name === 'secure_scan').execute({}, {}), /Fix the plugin configuration/)
+  assert.equal(calls, 0)
+  const health = await definitions.find(t => t.name === 'secure_health').execute({}, {})
+  assert.equal(health.ok, false); assert.match(health.configurationError, /engine/)
 })

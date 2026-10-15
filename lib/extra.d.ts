@@ -5,4 +5,5 @@
  */
 import { type ResolvedSecureConfig } from './config.js';
 import type { SecureToolDefinition } from './tools.js';
-export declare function buildExtraTools(cfg: ResolvedSecureConfig, cwd: string, signal?: AbortSignal): SecureToolDefinition[];
+import type { ProcessRunner } from './runner.js';
+export declare function buildExtraTools(cfg: ResolvedSecureConfig, cwd: string, signal?: AbortSignal, runner?: ProcessRunner): SecureToolDefinition[];

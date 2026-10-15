@@ -7,8 +7,13 @@
 import path from 'node:path'
 
 export type Severity = 'critical' | 'high' | 'medium' | 'low'
+export type SourceEngine = 'builtin' | 'betterleaks' | 'semgrep'
 
 export interface SecureConfig {
+  engines?: SourceEngine[]
+  enginePaths?: Partial<Record<SourceEngine | 'osv', string>>
+  engineTimeoutMs?: number
+  osvDatabaseDir?: string
   maxFiles?: number
   maxFileBytes?: number
   failOn?: Severity
@@ -16,6 +21,10 @@ export interface SecureConfig {
 }
 
 export interface ResolvedSecureConfig {
+  engines: SourceEngine[]
+  enginePaths: Partial<Record<SourceEngine | 'osv', string>>
+  engineTimeoutMs: number
+  osvDatabaseDir?: string
   maxFiles: number
   maxFileBytes: number
   failOn: Severity
@@ -27,6 +36,13 @@ export const DEFAULT_EXCLUDE_DIRS = ['node_modules', '.git', 'dist', 'build', 'o
 
 export function resolveConfig(config: SecureConfig | undefined | null, cwd = process.cwd()): ResolvedSecureConfig {
   const cfg = config ?? {}
+  const engines = cfg.engines ?? ['builtin']
+  if (!Array.isArray(engines) || !engines.length || engines.some(e => !['builtin', 'betterleaks', 'semgrep'].includes(e))) throw new Error('至少选择一个检查引擎：builtin、betterleaks、semgrep / Select at least one scanning engine: builtin, betterleaks, semgrep')
+  const enginePaths = cfg.enginePaths ?? {}
+  if (!enginePaths || typeof enginePaths !== 'object' || Array.isArray(enginePaths) || Object.entries(enginePaths).some(([key, value]) => !['betterleaks','semgrep','osv'].includes(key) || typeof value !== 'string' || !value.trim() || /[\0\r\n]/.test(value))) throw new Error('enginePaths 必须为引擎名到可执行文件路径的映射。')
+  const engineTimeoutMs = cfg.engineTimeoutMs ?? 60000
+  if (!Number.isInteger(engineTimeoutMs) || engineTimeoutMs < 1000 || engineTimeoutMs > 180000) throw new Error('engineTimeoutMs 需为 1000–180000 的整数。')
+  if (cfg.osvDatabaseDir !== undefined && (typeof cfg.osvDatabaseDir !== 'string' || !cfg.osvDatabaseDir.trim() || /[\0\r\n]/.test(cfg.osvDatabaseDir))) throw new Error('osvDatabaseDir 必须为非空缓存目录路径。')
   let maxFiles = 5000
   if (cfg.maxFiles !== undefined) {
     if (typeof cfg.maxFiles !== 'number' || !Number.isFinite(cfg.maxFiles) || cfg.maxFiles <= 0) throw new Error('maxFiles 必须是大于 0 的数字。')
@@ -40,7 +56,7 @@ export function resolveConfig(config: SecureConfig | undefined | null, cwd = pro
   const failOn: Severity = cfg.failOn === 'critical' || cfg.failOn === 'high' || cfg.failOn === 'medium' || cfg.failOn === 'low' ? cfg.failOn : 'medium'
   const stateDir = typeof cfg.stateDir === 'string' && cfg.stateDir.trim() !== '' ? path.resolve(cwd, cfg.stateDir.trim()) : path.join(cwd, '.code-security')
   const rawStateDir = typeof cfg.stateDir === 'string' && cfg.stateDir.trim() ? cfg.stateDir.trim() : '.code-security'
-  return { maxFiles, maxFileBytes, failOn, stateDir, ...(path.isAbsolute(rawStateDir) ? {} : { stateDirRelative: rawStateDir }) }
+  return { maxFiles, maxFileBytes, failOn, stateDir, engines: [...new Set(engines)], enginePaths: { ...enginePaths }, engineTimeoutMs, ...(cfg.osvDatabaseDir ? { osvDatabaseDir: path.resolve(cwd, cfg.osvDatabaseDir) } : {}), ...(path.isAbsolute(rawStateDir) ? {} : { stateDirRelative: rawStateDir }) }
 }
 
 export function optionalString(args: Record<string, unknown>, key: string): string | undefined {

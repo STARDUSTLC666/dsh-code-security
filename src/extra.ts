@@ -9,6 +9,11 @@ import { optionalString, requiredString, type ResolvedSecureConfig } from './con
 import { scanDeps } from './deps.js'
 import { findingFingerprint, loadState, saveBaseline } from './state.js'
 import type { SecureToolDefinition } from './tools.js'
+import { scanArguments } from './tools.js'
+import type { ProcessRunner } from './runner.js'
+import { auditDependencies, type ScanDocument } from './engines.js'
+import { loadPolicy } from './policy.js'
+import fs from 'node:fs/promises'
 
 function compileParameters(spec: Record<string, any>): { type: 'object'; properties: Record<string, unknown>; required?: string[] } {
   const properties: Record<string, unknown> = {}
@@ -18,12 +23,13 @@ function compileParameters(spec: Record<string, any>): { type: 'object'; propert
     const node: Record<string, unknown> = {}
     if (typeof prop?.type === 'string') node.type = prop.type
     if (typeof prop?.description === 'string') node.description = prop.description
+    if (prop?.enum !== undefined) node.enum = prop.enum
     properties[key] = node
   }
   return { type: 'object', properties, ...(required.length > 0 ? { required } : {}) }
 }
 
-export function buildExtraTools(cfg: ResolvedSecureConfig, cwd: string, signal?: AbortSignal): SecureToolDefinition[] {
+export function buildExtraTools(cfg: ResolvedSecureConfig, cwd: string, signal?: AbortSignal, runner?: ProcessRunner): SecureToolDefinition[] {
   const stateDir = cfg.stateDir
 
   const secureBaseline: SecureToolDefinition = {
@@ -60,9 +66,10 @@ export function buildExtraTools(cfg: ResolvedSecureConfig, cwd: string, signal?:
 
   const secureDeps: SecureToolDefinition = {
     name: 'secure_deps',
-    description: 'SBOM-lite：解析项目依赖清单（package.json / requirements.txt / pyproject.toml / go.mod / Cargo.toml / composer.json / Gemfile），列出依赖名称、版本约束与风险标记（wildcard/git/local/unpinned）。不联网。',
+    description: '解析依赖清单与锁文件。默认仅离线清单；audit=offline 使用本地 OSV 数据库，audit=online 明确允许向 OSV 查询包名/版本等依赖信息。不执行包管理器或安装脚本。清单检查不等于已知漏洞审计。',
     parameters: compileParameters({
       target: { type: 'string', description: '扫描根目录（可选，默认当前工作区）。' },
+      audit: { type: 'string', enum: ['none','offline','online'], description: '默认 none。offline 需要本地漏洞库；online 会向 OSV 查询依赖信息，不上传源码。' },
     }),
     output: {
       schema: {
@@ -86,10 +93,20 @@ export function buildExtraTools(cfg: ResolvedSecureConfig, cwd: string, signal?:
       },
     },
     async execute(rawArgs: unknown) {
-      const args = (rawArgs ?? {}) as Record<string, unknown>
+      const args = scanArguments(rawArgs, ['target', 'audit'])
+      const mode = args.audit ?? 'none'
+      if (!['none','offline','online'].includes(String(mode))) throw new Error('audit 只支持 none、offline、online')
       const target = optionalString(args, 'target')
       const root = path.resolve(cwd, target ?? '.')
-      return scanDeps(root)
+      const documents: ScanDocument[] = []; let bytes = 0, truncated = false
+      const rootDir = (await fs.lstat(root)).isDirectory() ? root : path.dirname(root)
+      const inventory = await scanDeps(root, { maxFiles: cfg.maxFiles, maxFileBytes: cfg.maxFileBytes, signal, policy: await loadPolicy(cwd),
+        ...(mode === 'none' ? {} : { onDocument(doc: ScanDocument) { if (bytes + Buffer.byteLength(doc.text) > 64 * 1024 * 1024) { truncated = true; return }; bytes += Buffer.byteLength(doc.text); documents.push({ file: path.relative(cwd, path.join(rootDir, doc.file)).split(path.sep).join('/'), text: doc.text }) } }) })
+      if (mode === 'none') return { ...inventory, audited: false, audit: null }
+      if (!runner) throw new Error('OSV 审计需要宿主 subprocess 服务')
+      const audit = await auditDependencies(documents, mode as 'offline' | 'online', cfg, runner, signal)
+      if (truncated && audit.coverage.status === 'completed') audit.coverage = { ...audit.coverage, status: 'partial', reason: 'snapshot-size-limit' }
+      return { ...inventory, audited: audit.coverage.status === 'completed', audit, passed: inventory.complete && audit.coverage.status === 'completed' && audit.vulnerabilities.length === 0 }
     },
     timeoutMs: 30000,
   }

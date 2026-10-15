@@ -7,11 +7,19 @@
 
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { createHash, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import lockfile from 'proper-lockfile'
 import type { Finding } from './scanner.js'
+import { evidenceFingerprint, protectFinding, redactText } from './privacy.js'
+import type { SourceEngine } from './config.js'
+import type { EngineCoverage } from './engines.js'
+import type { ScanScope } from './audit.js'
 
 export interface ScanStateEntry {
+  complete?: boolean
+  coverage?: EngineCoverage[]
+  engines?: SourceEngine[]
+  scope?: ScanScope
   mode: string
   target: string
   time: string
@@ -40,9 +48,7 @@ const STATE_FILE = 'state.json'
 const HISTORY_LIMIT = 50
 
 export function findingFingerprint(finding: Finding): string {
-  const file = finding.file.split(path.sep).join('/').replace(/^(?:\.\/)+/, '')
-  const raw = finding.ruleId + '|' + file + '|' + finding.snippet.trim()
-  return createHash('sha256').update(raw).digest('hex')
+  return evidenceFingerprint(finding)
 }
 
 export function statePath(stateDir: string): string {
@@ -50,6 +56,18 @@ export function statePath(stateDir: string): string {
 }
 
 export async function loadState(stateDir: string): Promise<StateDocument> {
+  const initial = await readState(stateDir)
+  const protectedState = protectState(initial)
+  if (JSON.stringify(initial) === JSON.stringify(protectedState)) return protectedState
+  const unlock = await lockfile.lock(stateDir, { retries: { retries: 30, minTimeout: 25, maxTimeout: 100 } })
+  try {
+    const state = protectState(await readState(stateDir))
+    await writeState(stateDir, state)
+    return state
+  } finally { await unlock() }
+}
+
+async function readState(stateDir: string): Promise<StateDocument> {
   try {
     const info = await fs.lstat(statePath(stateDir))
     if (!info.isFile() || info.isSymbolicLink() || info.size > 16 * 1024 * 1024) throw new Error('记录不是普通文件或超过 16 MiB')
@@ -65,6 +83,14 @@ export async function loadState(stateDir: string): Promise<StateDocument> {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw new Error('安全扫描记录无法读取，原文件已保留：' + (error instanceof Error ? error.message : String(error)))
     return { last: null, history: [], baseline: null }
   }
+}
+
+function protectState(state: StateDocument): StateDocument {
+  const clean = <T extends ScanStateEntry | BaselineEntry>(entry: T): T => {
+    const findings = entry.findings.map(protectFinding)
+    return { ...entry, ...('reason' in entry ? { reason: redactText(entry.reason) } : {}), findings, fingerprints: findings.map(findingFingerprint) }
+  }
+  return { last: state.last ? clean(state.last) : null, history: state.history.map(clean), baseline: state.baseline ? clean(state.baseline) : null }
 }
 
 function isEntry(value: unknown): value is ScanStateEntry {
@@ -100,7 +126,7 @@ export async function saveState(stateDir: string, entry: ScanStateEntry, signal?
   const unlock = await lockfile.lock(stateDir, { retries: { retries: 30, minTimeout: 25, maxTimeout: 100 } })
   try {
     signal?.throwIfAborted()
-    const state = await loadState(stateDir)
+    const state = protectState(await readState(stateDir))
     state.last = entry
     state.history.unshift(entry)
     state.history = state.history.slice(0, HISTORY_LIMIT)
@@ -114,7 +140,7 @@ export async function saveBaseline(stateDir: string, baseline: BaselineEntry, si
   const unlock = await lockfile.lock(stateDir, { retries: { retries: 30, minTimeout: 25, maxTimeout: 100 } })
   try {
     signal?.throwIfAborted()
-    const state = await loadState(stateDir)
+    const state = protectState(await readState(stateDir))
     state.baseline = baseline
     return await writeState(stateDir, state, signal)
   } finally { await unlock() }
@@ -123,7 +149,7 @@ export async function saveBaseline(stateDir: string, baseline: BaselineEntry, si
 async function writeState(stateDir: string, state: StateDocument, signal?: AbortSignal): Promise<string> {
   signal?.throwIfAborted()
   const file = statePath(stateDir)
-  const tmp = file + '.tmp-' + randomUUID(), bytes = JSON.stringify(state, null, 2)
+  const tmp = file + '.tmp-' + randomUUID(), bytes = JSON.stringify(protectState(state), null, 2)
   if (Buffer.byteLength(bytes) > 16 * 1024 * 1024) throw new Error('安全扫描记录超过 16 MiB，本次没有保存。')
   try { await fs.writeFile(tmp, bytes, { flag: 'wx', mode: 0o600, signal }); signal?.throwIfAborted(); await fs.rename(tmp, file) }
   finally { await fs.unlink(tmp).catch(() => {}) }

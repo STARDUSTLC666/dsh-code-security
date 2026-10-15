@@ -13,8 +13,9 @@ Feedback and contributions are welcome: report [issues](https://github.com/STARD
 ## What it does
 
 - Scan files, directories or Git diffs with locations and code evidence.
-- Recheck fixes and manage baselines or scan policy.
-- Export Markdown or SARIF reports and inspect dependency manifests.
+- Inspect new findings, coverage and redacted evidence in DSH Settings, then recheck fixes.
+- Optionally use Betterleaks for secrets, Semgrep CE for data flow and OSV for dependency advisories.
+- Export Markdown/SARIF, maintain baselines, and opt into quiet per-project change checks.
 
 ## Install
 
@@ -28,11 +29,11 @@ For the web version, replace `desktop` with `web`. Restart DSH after installatio
 
 ## Start using it
 
-Ask: “Review the current Git diff for security findings, show evidence and recheck the fixes.”
+Ask: “Review the current Git diff for security findings, show evidence and recheck the fixes.” Then open **Settings → Code security** to view the project and results.
 
 ## Requirements and configuration
 
-Deterministic rules run locally. See the usage guide for rule coverage, baselines and policy configuration.
+Built-in rules run locally by default. Optional programs are installed by the user; basic checks work without them. Online dependency audits require an explicit mode choice, and automatic checks are off by default. Complete detected credentials are redacted before return, persistence and export.
 
 Detailed configuration, tool arguments and troubleshooting are in the [usage guide](docs/USAGE.en.md). For standalone development, follow the Node requirement in [package.json](package.json).
 

@@ -3,8 +3,8 @@
  *
  * 插件导出 apply(ctx, config)：注册 secure_scan / secure_diff / secure_fix_verify /
  * secure_report / secure_export / secure_baseline / secure_deps / secure_policy_show /
- * secure_policy_set / secure_health 十个工具。扫描为纯确定性规则，
- * git diff 通过官方 subprocess 服务执行，仅依赖文件锁库。
+ * secure_policy_set / secure_health 十个工具。内置规则与可选本地引擎共用
+ * 脱敏、覆盖状态与基线；子进程通过官方服务执行，设置面板与自动检查按需挂载。
  *
  * @module dsh-code-security
  */
@@ -23,6 +23,7 @@ export interface SecurePluginContext {
     on?(event: string, listener: (...args: any[]) => unknown, options?: {
         prepend?: boolean;
     }): (() => void) | void;
+    inject?(services: string[], callback: (ctx: any) => void): unknown;
 }
 export declare function apply(ctx: SecurePluginContext, config?: SecureConfig | null): void;
 export * from './config.js';
@@ -35,3 +36,8 @@ export * from './scanner.js';
 export * from './state.js';
 export * from './extra.js';
 export * from './tools.js';
+export * from './engines.js';
+export * from './audit.js';
+export * from './privacy.js';
+export * from './workbench.js';
+export * from './automatic.js';

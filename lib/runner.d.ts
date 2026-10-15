@@ -14,6 +14,7 @@ export interface ProcessRunner {
         timeoutMs?: number;
         cwd?: string;
         signal?: AbortSignal;
+        env?: Record<string, string>;
     }): Promise<RunResult>;
 }
 export interface SubprocessHandleLike {
@@ -25,11 +26,13 @@ export interface SubprocessHandleLike {
         stdout?: {
             readFrom(offset: number): {
                 text: string;
+                lossy?: boolean;
             };
         };
         stderr?: {
             readFrom(offset: number): {
                 text: string;
+                lossy?: boolean;
             };
         };
     };
@@ -50,6 +53,7 @@ export interface SubprocessSpawnLike {
         };
         graceMs: number;
         signal?: AbortSignal;
+        env?: Record<string, string>;
     }): SubprocessHandleLike;
 }
 export declare function createSubprocessRunner(spawn: SubprocessSpawnLike, graceMs: number, defaultTimeoutMs: number): ProcessRunner;

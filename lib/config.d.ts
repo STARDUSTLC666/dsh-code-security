@@ -4,13 +4,22 @@
  * @module dsh-code-security/config
  */
 export type Severity = 'critical' | 'high' | 'medium' | 'low';
+export type SourceEngine = 'builtin' | 'betterleaks' | 'semgrep';
 export interface SecureConfig {
+    engines?: SourceEngine[];
+    enginePaths?: Partial<Record<SourceEngine | 'osv', string>>;
+    engineTimeoutMs?: number;
+    osvDatabaseDir?: string;
     maxFiles?: number;
     maxFileBytes?: number;
     failOn?: Severity;
     stateDir?: string;
 }
 export interface ResolvedSecureConfig {
+    engines: SourceEngine[];
+    enginePaths: Partial<Record<SourceEngine | 'osv', string>>;
+    engineTimeoutMs: number;
+    osvDatabaseDir?: string;
     maxFiles: number;
     maxFileBytes: number;
     failOn: Severity;

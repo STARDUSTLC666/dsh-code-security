@@ -125,7 +125,7 @@ test('full scans locate file rules at their evidence lines and apply direct-file
   assert.deepEqual(direct.findings, [])
   const all = await scanPath({ cwd: root, maxFiles: 100, maxFileBytes: 10000, policy: selectedPolicy })
   assert.deepEqual(all.findings.map(f => f.file), ['src/keep.js'])
-  assert.deepEqual(scanText('# config\n\nAPI_TOKEN=fixture-value\n', '.env', '.env', policy).map(f => [f.ruleId, f.line, f.snippet]), [['SEC-305', 3, 'API_TOKEN=fixture-value']])
+  assert.deepEqual(scanText('# config\n\nAPI_TOKEN=fixture-value\n', '.env', '.env', policy).map(f => [f.ruleId, f.line, f.snippet]), [['SEC-305', 3, 'API_TOKEN=[REDACTED]']])
   assert.deepEqual(scanText('fund=false\naudit=false\n', '.npmrc', '.npmrc', policy).map(f => [f.ruleId, f.line]), [['SEC-404', 2]])
   assert.deepEqual(scanText('fixture only\n-----BEGIN PRIVATE KEY-----\n', 'key.pem', 'key.pem', policy).map(f => [f.ruleId, f.line]), [['SEC-303', 2]])
 })
