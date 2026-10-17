@@ -1,6 +1,6 @@
 {
   "name": "dsh-code-security",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "对代码与 Git 改动进行本地静态安全检查，并追踪修复结果。",
   "type": "module",
   "main": "lib/index.js",
@@ -35,7 +35,9 @@
       "patch": "./cordis.patch.yml"
     },
     "client": {
-      "inject": ["@deepseek-ai/dsh-client-ui-settings"],
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings"
+      ],
       "platform": "web"
     }
   },
