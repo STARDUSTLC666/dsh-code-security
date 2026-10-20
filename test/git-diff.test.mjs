@@ -235,8 +235,8 @@ test('secure_diff 不执行被扫仓库的 core.fsmonitor 命令', async t => {
   assert.deepEqual(result.findings.map(f => f.ruleId), ['SEC-001'])
   await assert.rejects(fs.stat(path.join(root, 'fsmonitor-ran')), { code: 'ENOENT' })
   // 正向对照：普通 Git 会执行配置里的 fsmonitor 命令。脚本只写标记，不实现完整
-  // 协议，因此这里只关心它是否被启动，忽略 Git 的退出码。
-  await runner.run(['git', 'diff', 'HEAD', '--', 'a.js'], { cwd: root })
+  // 协议，Git 可能因此报错甚至 abort（Linux 上就是 SIGABRT），这里只关心它是否被启动。
+  await runner.run(['git', 'diff', 'HEAD', '--', 'a.js'], { cwd: root }).catch(() => {})
   assert.equal(await fs.readFile(path.join(root, 'fsmonitor-ran'), 'utf8'), 'ran')
 })
 
