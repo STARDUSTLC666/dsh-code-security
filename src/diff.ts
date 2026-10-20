@@ -40,8 +40,15 @@ export interface DiffScanResult {
  */
 export const GIT_SAFE_CONFIG_ARGS: readonly string[] = ['-c', 'core.fsmonitor=false', '-c', 'core.untrackedCache=false']
 
-/** SHA-1 与 SHA-256 仓库的空树对象 ID（`git hash-object -t tree` 对空输入的结果）。 */
-const EMPTY_TREE_OID = { sha1: '4b825dc642cb6eb9a060e54bf8d69288fbee4904', sha256: '6ef19b41225c5369f1c104d45d8d85efa9b057b53b14b4b9b939dd74decc5321' }
+/**
+ * 空树对象 ID：git 对空 tree 的内容做对象头哈希（"tree 0\0"）。
+ *
+ * 现算而不是写死常量，既跟随仓库的哈希算法，也不会让一串十六进制被
+ * 密钥类规则当成可疑字符串。
+ */
+function emptyTreeOidFor(format: 'sha1' | 'sha256'): string {
+  return createHash(format).update('tree 0\u0000').digest('hex')
+}
 
 const emptyTreeCache = new Map<string, string>()
 
@@ -55,7 +62,7 @@ async function emptyTreeOid(runner: ProcessRunner, cwd: string, timeoutMs: numbe
   const cached = emptyTreeCache.get(cwd)
   if (cached !== undefined) return cached
   const result = await runner.run(['git', ...GIT_SAFE_CONFIG_ARGS, 'rev-parse', '--show-object-format'], { cwd, timeoutMs: Math.min(timeoutMs, 10000) })
-  const oid = result.exitCode === 0 && /sha256/i.test(result.stdout) ? EMPTY_TREE_OID.sha256 : EMPTY_TREE_OID.sha1
+  const oid = emptyTreeOidFor(result.exitCode === 0 && /sha256/i.test(result.stdout) ? 'sha256' : 'sha1')
   emptyTreeCache.set(cwd, oid)
   return oid
 }
