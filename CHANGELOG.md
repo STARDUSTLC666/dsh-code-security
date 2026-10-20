@@ -4,6 +4,12 @@
 
 [历史英文记录](docs/CHANGELOG.en.md)
 
+## 0.5.1（2026-10-20）
+
+- 修复审查外来仓库时可能执行对方 `.git/config` 命令的问题：所有 git 调用加上 `-c core.fsmonitor=false`，`secure_diff` 与 `secure_scan` 的 `includeUntracked` 都不再触发被扫仓库的 fsmonitor 命令
+- 修复 `filter.<驱动>.clean` 能把新增的危险行从 diff 里删掉、让检查误判「通过」的问题：diff 改用 `--attr-source=<空树>`（Git 2.40+），工作区 `.gitattributes` 不再生效，clean 过滤器既不执行也不参与内容比较；更老的 Git 退回只关闭 fsmonitor
+- 新增 4 项回归测试：fsmonitor 不执行、clean 过滤器不执行且藏不掉 `eval(input)`、`--attr-source` 参数、`includeUntracked` 的 `ls-files` 路径；同步更新既有的 argv 断言
+
 ## 0.5.0（2026-10-17）
 
 - 设置面板顶部新增「首次使用」分步引导：一次只讲一步，支持上一步/下一步/跳过，看完记在本机不再出现。

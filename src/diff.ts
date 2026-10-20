@@ -32,19 +32,53 @@ export interface DiffScanResult {
   diff: string
 }
 
+/**
+ * 屏蔽仓库自带配置里的可执行钩子。
+ *
+ * `-c core.fsmonitor=false`：否则 `git diff` / `git ls-files --others` 会执行
+ * 被扫仓库 `.git/config` 里的 fsmonitor 命令。
+ */
+export const GIT_SAFE_CONFIG_ARGS: readonly string[] = ['-c', 'core.fsmonitor=false', '-c', 'core.untrackedCache=false']
+
+/** SHA-1 与 SHA-256 仓库的空树对象 ID（`git hash-object -t tree` 对空输入的结果）。 */
+const EMPTY_TREE_OID = { sha1: '4b825dc642cb6eb9a060e54bf8d69288fbee4904', sha256: '6ef19b41225c5369f1c104d45d8d85efa9b057b53b14b4b9b939dd74decc5321' }
+
+const emptyTreeCache = new Map<string, string>()
+
+/**
+ * 取当前仓库的空树对象 ID，用作 `--attr-source`。
+ *
+ * 把属性查询指向空树后，被扫仓库工作区里的 `.gitattributes` 不再生效，
+ * 因此 `filter.<驱动>.clean` 不会被调用，diff 也不会被 clean 输出替换。
+ */
+async function emptyTreeOid(runner: ProcessRunner, cwd: string, timeoutMs: number): Promise<string> {
+  const cached = emptyTreeCache.get(cwd)
+  if (cached !== undefined) return cached
+  const result = await runner.run(['git', ...GIT_SAFE_CONFIG_ARGS, 'rev-parse', '--show-object-format'], { cwd, timeoutMs: Math.min(timeoutMs, 10000) })
+  const oid = result.exitCode === 0 && /sha256/i.test(result.stdout) ? EMPTY_TREE_OID.sha256 : EMPTY_TREE_OID.sha1
+  emptyTreeCache.set(cwd, oid)
+  return oid
+}
+
 /** 运行 git diff（默认 HEAD，工作区未提交改动）。 */
 export async function runGitDiff(runner: ProcessRunner, cwd: string, base: string, target?: string, timeoutMs = 30000, staged = false): Promise<string> {
   if (typeof base !== 'string' || base.trim() === '' || base.trim().startsWith('-') || base.includes('\0')) {
     throw new Error('参数 base 必须是非空的 Git ref，不能是 Git 命令选项。')
   }
-  const argv = ['git', 'diff']
+  const attrSource = '--attr-source=' + await emptyTreeOid(runner, cwd, timeoutMs)
+  const argv = ['git', ...GIT_SAFE_CONFIG_ARGS, attrSource, 'diff']
   if (staged) argv.push('--cached')
   argv.push('--no-ext-diff', '--no-textconv', '--no-color', '--relative',
     '--src-prefix=a/', '--dst-prefix=b/', '--unified=3',
     '--output-indicator-new=+', '--output-indicator-old=-', '--output-indicator-context= ',
     base.trim(), '--')
   if (target !== undefined && target.trim() !== '') argv.push(target.trim())
-  const result = await runner.run(argv, { timeoutMs, cwd })
+  let result = await runner.run(argv, { timeoutMs, cwd })
+  // git < 2.40 不认识 --attr-source：退回只关闭 fsmonitor 的调用（filter 加固缺席，
+  // 但不会因此拒绝整个扫描）。
+  if (result.exitCode !== 0 && /attr-source/i.test(result.stderr)) {
+    result = await runner.run(argv.filter((arg) => arg !== attrSource), { timeoutMs, cwd })
+  }
   if (result.exitCode !== 0 && result.exitCode !== 1) {
     throw new Error('git diff 失败（退出码 ' + String(result.exitCode) + '）：' + result.stderr.trim().split(/\r?\n/).slice(-4).join(' | '))
   }

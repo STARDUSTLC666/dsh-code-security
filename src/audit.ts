@@ -4,7 +4,7 @@ import type { ResolvedSecureConfig, SourceEngine } from './config.js'
 import type { ProcessRunner } from './runner.js'
 import type { SecurePolicy } from './policy.js'
 import { policyIgnores } from './policy.js'
-import { parseDiff, runGitDiff, scanDiff } from './diff.js'
+import { GIT_SAFE_CONFIG_ARGS, parseDiff, runGitDiff, scanDiff } from './diff.js'
 import { isExcludedPath, scanPath } from './scanner.js'
 import { mergeFindings, scanExternal, type EngineCoverage, type ScanDocument } from './engines.js'
 
@@ -32,7 +32,7 @@ export async function runSourceCheck(scope: ScanScope, cfg: ResolvedSecureConfig
         if (rel.startsWith('..') || path.isAbsolute(rel)) throw new Error('增量文件超出当前工作区')
         let text: string
         if (scope.staged) {
-          const shown = await runner.run(['git','show',':./' + file.file], { cwd, timeoutMs: 30000, signal })
+          const shown = await runner.run(['git', ...GIT_SAFE_CONFIG_ARGS, 'show', ':./' + file.file], { cwd, timeoutMs: 30000, signal })
           if (shown.exitCode !== 0) throw new Error('无法读取暂存区文件，请刷新后重试')
           text = shown.stdout
         } else {
@@ -49,7 +49,7 @@ export async function runSourceCheck(scope: ScanScope, cfg: ResolvedSecureConfig
       if (await runGitDiff(runner, cwd, scope.base, scope.target, 30000, scope.staged) !== diff) throw new Error('扫描期间 Git 改动已变化，请重试')
     }
     if (scope.includeUntracked && !scope.staged) {
-      const untracked = await runner.run(['git','ls-files','--others','--exclude-standard','-z','--',scope.target ?? '.'], { cwd, signal, timeoutMs: 30000 })
+      const untracked = await runner.run(['git', ...GIT_SAFE_CONFIG_ARGS, 'ls-files', '--others', '--exclude-standard', '-z', '--', scope.target ?? '.'], { cwd, signal, timeoutMs: 30000 })
       if (untracked.exitCode !== 0) throw new Error('无法读取未跟踪文件列表')
       if (untracked.stdout && !untracked.stdout.endsWith('\0')) throw new Error('未跟踪文件列表不完整，已有记录未覆盖')
       const names = untracked.stdout.split('\0').filter(Boolean)

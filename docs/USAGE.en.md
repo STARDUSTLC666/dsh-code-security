@@ -85,7 +85,7 @@ Policy file: `.code-security.json`.
 {"version":1,"exclude":["vendor/**","generated/**"],"ignore":[{"ruleId":"SEC-206","file":"test/**","reason":"Not security-sensitive"}],"failOn":"high"}
 ```
 
-Git runs with external diff/textconv disabled. Paths are relative to the session workspace. Staged scans read the index and only added-line findings are reported. Invalid arguments, Git refs and incomplete hunks preserve previous state.
+Git runs with external diff/textconv disabled, and the reviewed repository's own executable config is neutralised too: every git call passes `-c core.fsmonitor=false`, and diff runs with `--attr-source=<empty tree>` so the worktree `.gitattributes` no longer applies (a `filter.<driver>.clean` is neither executed nor able to rewrite the diff). `--attr-source` needs Git 2.40+; older versions fall back to disabling fsmonitor only. Paths are relative to the session workspace. Staged scans read the index and only added-line findings are reported. Invalid arguments, Git refs and incomplete hunks preserve previous state.
 
 ## Development and licenses
 

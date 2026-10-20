@@ -210,3 +210,64 @@ test('secure_diff persists reviewed file counts and renders skipped policy match
   const state = JSON.parse(await fs.readFile(path.join(root, '.code-security/state.json'), 'utf8'))
   assert.equal(state.last.filesScanned, 1)
 })
+const shellQuote = value => "'" + value.replace(/'/g, "'\\''") + "'"
+
+test('runGitDiff 关掉 fsmonitor 并让属性查询落在空树上', async () => {
+  const calls = []
+  const capture = { async run(argv) { calls.push(argv); return { exitCode: 0, signal: null, stdout: '', stderr: '' } } }
+  await runGitDiff(capture, '/fixture/repo', 'HEAD')
+  const diffCall = calls.find(argv => argv.includes('diff'))
+  assert.ok(diffCall, 'must run git diff')
+  assert.ok(diffCall.includes('core.fsmonitor=false'), diffCall.join(' '))
+  assert.ok(diffCall.some(arg => arg.startsWith('--attr-source=')), diffCall.join(' '))
+})
+
+test('secure_diff 不执行被扫仓库的 core.fsmonitor 命令', async t => {
+  const { root, git, write, tools } = await project(t, {
+    'fsmonitor.cjs': 'require("node:fs").writeFileSync(require("node:path").join(__dirname, "fsmonitor-ran"), "ran");\nprocess.stdout.write("2\\0\\0");\n',
+    'a.js': 'const safe = 1\n',
+  })
+  const command = shellQuote(process.execPath.replace(/\\/g, '/')) + ' ' + shellQuote(path.join(root, 'fsmonitor.cjs').replace(/\\/g, '/'))
+  await git('config', '--local', 'core.fsmonitor', command)
+  await write('a.js', 'eval(input)\n')
+  const result = await tools.find(tool => tool.name === 'secure_diff').execute({}, {})
+  assert.equal(result.passed, false)
+  assert.deepEqual(result.findings.map(f => f.ruleId), ['SEC-001'])
+  await assert.rejects(fs.stat(path.join(root, 'fsmonitor-ran')), { code: 'ENOENT' })
+  // 正向对照：普通 Git 会执行配置里的 fsmonitor 命令。脚本只写标记，不实现完整
+  // 协议，因此这里只关心它是否被启动，忽略 Git 的退出码。
+  await runner.run(['git', 'diff', 'HEAD', '--', 'a.js'], { cwd: root })
+  assert.equal(await fs.readFile(path.join(root, 'fsmonitor-ran'), 'utf8'), 'ran')
+})
+
+test('secure_diff 不套用 clean 过滤器，藏不掉新增的危险行', async t => {
+  const { root, git, write, tools } = await project(t, {
+    '.gitattributes': '*.js filter=security-hidden\n',
+    'a.js': 'const safe = 1\n',
+    'cleaner.cjs': 'require("node:fs").writeFileSync(require("node:path").join(__dirname, "cleaner-ran"), "ran");\nprocess.stdout.write("const safe = 1\\n");\n',
+  })
+  const command = shellQuote(process.execPath.replace(/\\/g, '/')) + ' ' + shellQuote(path.join(root, 'cleaner.cjs').replace(/\\/g, '/'))
+  await git('config', '--local', 'filter.security-hidden.clean', command)
+  await write('a.js', 'const safe = 1\neval(input)\n')
+  const result = await tools.find(tool => tool.name === 'secure_diff').execute({}, {})
+  assert.equal(result.passed, false)
+  assert.deepEqual(result.findings.map(f => [f.ruleId, f.file, f.line]), [['SEC-001', 'a.js', 2]])
+  await assert.rejects(fs.stat(path.join(root, 'cleaner-ran')), { code: 'ENOENT' })
+  // 正向对照：普通 Git 会跑 clean 过滤器，diff 里看不到 eval(input)。
+  const raw = await git('diff', 'HEAD', '--', 'a.js')
+  assert.equal(await fs.readFile(path.join(root, 'cleaner-ran'), 'utf8'), 'ran')
+  assert.doesNotMatch(raw, /eval\(input\)/)
+})
+test('includeUntracked 的 ls-files 同样不执行被扫仓库的 fsmonitor 命令', async t => {
+  const { root, git, write, tools } = await project(t, {
+    'fsmonitor.cjs': 'require("node:fs").writeFileSync(require("node:path").join(__dirname, "fsmonitor-ran"), "ran");\nprocess.stdout.write("2\\0\\0");\n',
+    'tracked.js': 'const safe = 1\n',
+  })
+  const command = shellQuote(process.execPath.replace(/\\/g, '/')) + ' ' + shellQuote(path.join(root, 'fsmonitor.cjs').replace(/\\/g, '/'))
+  await git('config', '--local', 'core.fsmonitor', command)
+  await write('untracked.js', 'eval(input)\n')
+  const result = await tools.find(tool => tool.name === 'secure_diff').execute({ includeUntracked: true }, {})
+  assert.equal(result.passed, false)
+  assert.deepEqual(result.findings.map(f => f.file), ['untracked.js'])
+  await assert.rejects(fs.stat(path.join(root, 'fsmonitor-ran')), { code: 'ENOENT' })
+})

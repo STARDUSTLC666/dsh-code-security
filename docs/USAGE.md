@@ -88,7 +88,7 @@ OSV 2.7.0 当前实现使用 `缓存目录/osv-scalibr/npm/all.zip`（Python 使
 }
 ```
 
-Git 输出禁用外部 diff/textconv，路径相对当前会话工作区。暂存检查读取 Git index；新增行才计入差异发现。错写参数、无效 Git ref 或不完整 diff 不会覆盖已有记录。
+Git 输出禁用外部 diff/textconv，并额外关掉被扫仓库自带的可执行配置：所有 git 调用都带 `-c core.fsmonitor=false`，diff 还用 `--attr-source=<空树>` 让 `.gitattributes` 不生效（`filter.<驱动>.clean` 既不执行、也无法改写 diff 内容）。`--attr-source` 需要 Git 2.40+，更老的版本会退回只关闭 fsmonitor 的调用。路径相对当前会话工作区。暂存检查读取 Git index；新增行才计入差异发现。错写参数、无效 Git ref 或不完整 diff 不会覆盖已有记录。
 
 ## 开发与许可
 

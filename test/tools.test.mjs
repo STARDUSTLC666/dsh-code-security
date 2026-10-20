@@ -112,7 +112,10 @@ test('secure_diff staged=true 使用 --cached', async () => {
   const runner = { async run(argv) { calls.push(argv); return { exitCode: 0, signal: null, stdout: '', stderr: '' } } }
   const tools = buildSecureTools(cfg, dir, runner)
   await tools.find(t => t.name === 'secure_diff').execute({ staged: true }, {})
-  assert.ok(calls[0].includes('--cached'))
+  const diffCall = calls.find(argv => argv.includes('diff'))
+  assert.ok(diffCall, 'must invoke git diff')
+  assert.ok(diffCall.includes('--cached'), diffCall.join(' '))
+  assert.ok(diffCall.includes('core.fsmonitor=false'), diffCall.join(' '))
   await fs.rm(dir, { recursive: true, force: true })
 })
 
