@@ -4,6 +4,13 @@
 
 [历史英文记录](docs/CHANGELOG.en.md)
 
+## 0.6.0（2026-10-25）
+
+- 安全检查主工作台，问题、证据、覆盖与工具配置分开；切项目保护未保存设置，并通过原生会话打开文件。
+- 提供 DSH 原生侧栏入口，保留设置页；统一中英、深浅色、窄屏、键盘焦点与真实空/失败状态。
+- 浏览器源码移至 templates/client.js、templates/panels/ 与共享组件，独立构建为 lib/client.js；移除重复的首次引导。
+- 官方 DSH 0.2.1-rc.3 Web 逐项实际操作验收，账户模拟和未验收范围见 [工作台说明](docs/WORKBENCH.md)。
+
 ## 0.5.1（2026-10-20）
 
 - 修复审查外来仓库时可能执行对方 `.git/config` 命令的问题：所有 git 调用加上 `-c core.fsmonitor=false`，`secure_diff` 与 `secure_scan` 的 `includeUntracked` 都不再触发被扫仓库的 fsmonitor 命令
