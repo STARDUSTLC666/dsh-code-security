@@ -80,11 +80,11 @@ export async function runGitDiff(runner: ProcessRunner, cwd: string, base: strin
     '--output-indicator-new=+', '--output-indicator-old=-', '--output-indicator-context= ',
     base.trim(), '--')
   if (target !== undefined && target.trim() !== '') argv.push(target.trim())
-  let result = await runner.run(argv, { timeoutMs, cwd })
-  // git < 2.40 不认识 --attr-source：退回只关闭 fsmonitor 的调用（filter 加固缺席，
-  // 但不会因此拒绝整个扫描）。
+  const result = await runner.run(argv, { timeoutMs, cwd })
+  // Never disable attribute isolation on an older or incompatible Git. Doing
+  // so can execute a repository's clean filter and accept its altered output.
   if (result.exitCode !== 0 && /attr-source/i.test(result.stderr)) {
-    result = await runner.run(argv.filter((arg) => arg !== attrSource), { timeoutMs, cwd })
+    throw new Error('当前 Git 无法启用安全的属性隔离（--attr-source），未运行未加固的 diff，审查未完成。请升级到支持该选项的 Git，或改用文件全量扫描。')
   }
   if (result.exitCode !== 0 && result.exitCode !== 1) {
     throw new Error('git diff 失败（退出码 ' + String(result.exitCode) + '）：' + result.stderr.trim().split(/\r?\n/).slice(-4).join(' | '))

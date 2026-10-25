@@ -2,6 +2,10 @@
 
 [Overview](../README.en.md) · [Changelog](../CHANGELOG.md) · [Validation](VALIDATION.md)
 
+## Unsupported Git
+
+If Git cannot safely isolate attributes, diff scanning reports incomplete instead of falling back to commands that could execute repository filters. Upgrade Git or use the full-file scan; incomplete is not a security pass.
+
 ## Start with a change
 
 Ask in a project chat: “Check the current changes for security issues, show evidence, and recheck the repairs.” Or open **Settings → Code security**, select the project and choose **Scan code** or **Check changes**.
