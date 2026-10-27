@@ -1,6 +1,6 @@
 {
   "name": "dsh-code-security",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "对代码与 Git 改动进行本地静态安全检查，并追踪修复结果。",
   "type": "module",
   "main": "lib/index.js",
@@ -25,7 +25,7 @@
     "THIRD_PARTY_NOTICES.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json && node scripts/build-client.mjs",
+    "build": "tsc -p tsconfig.json && node scripts/build-client.mjs && node scripts/build-updates.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "pnpm run build && node --test \"test/*.test.mjs\"",
     "prepublishOnly": "pnpm run build"
@@ -35,12 +35,12 @@
       "patch": "./cordis.patch.yml"
     },
     "client": {
+      "platform": "web",
       "inject": [
         "@deepseek-ai/dsh-client-ui-settings",
         "@deepseek-ai/dsh-client-ui-layout",
         "@deepseek-ai/dsh-client-ui-sidebar"
-      ],
-      "platform": "web"
+      ]
     }
   },
   "keywords": [
@@ -55,7 +55,8 @@
   ],
   "license": "MIT",
   "engines": {
-    "node": "^22.19.0 || >=24.0.0"
+    "node": "^22.19.0 || >=24.0.0",
+    "dsh": ">=0.2.1-rc.3"
   },
   "devDependencies": {
     "@types/babel__traverse": "^7.28.0",
@@ -79,6 +80,7 @@
     "@babel/traverse": "7.29.10",
     "@babel/types": "7.29.8",
     "proper-lockfile": "4.1.2",
-    "smol-toml": "1.9.1"
+    "smol-toml": "1.9.1",
+    "@stardustlc/dsh-updates": "0.1.0"
   }
 }

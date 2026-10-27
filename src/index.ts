@@ -1,3 +1,4 @@
+import { registerUpdates } from '@stardustlc/dsh-updates'
 /**
  * dsh-code-security —— AI 代码安全审查插件（node 半身，配置走 cordis.patch.yml）。
  *
@@ -26,6 +27,8 @@ export interface SecurePluginContext {
 }
 
 export function apply(ctx: SecurePluginContext, config?: SecureConfig | null): void {
+  registerUpdates(ctx, { name: "dsh-code-security" })
+
   let cfg
   let configurationError: string | undefined
   try {

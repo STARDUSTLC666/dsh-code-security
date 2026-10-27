@@ -172,6 +172,9 @@ right.openResource('dsh-resource://file/session/' + encodeURIComponent(value.ses
                     setError(message(e.message));
             } }
             const disabled = busy || loading || dirty;
+// Update protection: dsh-code-security
+__stardustUpdatesGuard(React, "dsh-code-security", { dirty, busy: busy || loading });
+
             return h(W.Page,{workbench,title:t('代码安全','Code security'),subtitle:t('检查改动、核对证据并跟踪修复。','Check changes, review evidence and track fixes.'),className:'secw security-workbench',actions:catalog.length?h(React.Fragment,null,
  h(W.Button,{variant:'primary',disabled, onClick:()=>run('scan')},t('检查代码','Scan code')),h(W.Button,{disabled,onClick:()=>run('diff')},t('检查改动','Check changes')),
  h(W.Button,{disabled:disabled || !report?.hasScan,onClick:()=>run('verify')},t('复查修复','Recheck fixes')),h(W.IconButton,{icon:'refresh',label:t('刷新结果','Refresh results'),disabled:busy || loading || dirty,onClick:()=>open(id)})) : null},

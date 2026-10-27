@@ -4,6 +4,12 @@
 
 [历史英文记录](docs/CHANGELOG.en.md)
 
+## 0.7.0 (2026-10-26)
+
+- Add this plugin’s own update controls and independent preferences. Automatic installation stays off until explicitly enabled.
+- Confirm manual installs, preserve local sources and disabled state, pause for tasks or unsaved changes, and use native DSH recovery without forced restarts.
+- Require the public DSH 0.2.1-rc.3 update APIs; Suite components remain managed through Suite.
+
 ## 0.6.1（2026-10-26）
 
 - 移除旧 Git 不支持隔离属性时的无保护重试；明确返回检查未完成，并建议升级 Git 或改用全文件扫描，避免执行仓库过滤器后仍误报通过。
