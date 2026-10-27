@@ -1,6 +1,6 @@
 {
   "name": "dsh-code-security",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "对代码与 Git 改动进行本地静态安全检查，并追踪修复结果。",
   "type": "module",
   "main": "lib/index.js",
@@ -81,6 +81,6 @@
     "@babel/types": "7.29.8",
     "proper-lockfile": "4.1.2",
     "smol-toml": "1.9.1",
-    "@stardustlc/dsh-updates": "0.1.0"
+    "@stardustlc/dsh-updates": "0.1.1"
   }
 }
