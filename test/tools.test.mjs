@@ -5,6 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { buildSecureTools, resolveConfig } from '../lib/index.js'
+import { gitOutput } from './git-output.mjs'
 
 async function world(files = {}) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'secure-tools-'))
@@ -18,8 +19,8 @@ async function world(files = {}) {
 }
 
 const fakeRunner = {
-  async run(argv) {
-    return { exitCode: 0, signal: null, stdout: '', stderr: '' }
+  async run(argv, options) {
+    return { exitCode: 0, signal: null, stdout: gitOutput(argv, options.cwd), stderr: '' }
   },
 }
 
@@ -85,7 +86,7 @@ test('secure_fix_verify 对比基线并识别新增问题', async () => {
 test('secure_diff 使用 git diff 结果', async () => {
   const { dir, cfg } = await world({})
   const diff = `diff --git a/x.js b/x.js\n--- a/x.js\n+++ b/x.js\n@@ -0,0 +1,1 @@\n+eval(user)\n`
-  const runner = { async run() { return { exitCode: 0, signal: null, stdout: diff, stderr: '' } } }
+  const runner = { async run(argv, options) { return { exitCode: 0, signal: null, stdout: gitOutput(argv, options.cwd, diff), stderr: '' } } }
   const tools = buildSecureTools(cfg, dir, runner)
   const value = await tools.find(t => t.name === 'secure_diff').execute({ base: 'HEAD' }, {})
   assert.equal(value.findings.length, 1)
@@ -109,7 +110,7 @@ test('secure_policy_set 写入策略', async () => {
 test('secure_diff staged=true 使用 --cached', async () => {
   const { dir, cfg } = await world({})
   const calls = []
-  const runner = { async run(argv) { calls.push(argv); return { exitCode: 0, signal: null, stdout: '', stderr: '' } } }
+  const runner = { async run(argv, options) { calls.push(argv); return { exitCode: 0, signal: null, stdout: gitOutput(argv, options.cwd), stderr: '' } } }
   const tools = buildSecureTools(cfg, dir, runner)
   await tools.find(t => t.name === 'secure_diff').execute({ staged: true }, {})
   const diffCall = calls.find(argv => argv.includes('diff'))

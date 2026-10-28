@@ -6,6 +6,8 @@
 
 If Git cannot safely isolate attributes, diff scanning reports incomplete instead of falling back to commands that could execute repository filters. Upgrade Git or use the full-file scan; incomplete is not a security pass.
 
+Worktree, global and system attributes are excluded from diff conversion. Effective rules in `info/attributes`, including the common Git directory of linked worktrees, stop diff review because they take precedence over this isolation. No filters are executed and previous scan state is preserved. Use the full-file scan or remove the rules after understanding their purpose; the plugin never edits Git configuration. Blank and comment-only files remain supported.
+
 ## Start with a change
 
 Ask in a project chat: “Check the current changes for security issues, show evidence, and recheck the repairs.” Or open **Settings → Code security**, select the project and choose **Scan code** or **Check changes**.

@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, writeFile, readFile, symlink, rm } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { buildSecureTools, resolveConfig, scanPath, loadPolicy, normalizePolicy } from '../lib/index.js'
+import { gitOutput } from './git-output.mjs'
 
 test('扫描、策略和 git diff 使用当前会话工作区，取消后不写入状态', async t => {
   const root = await mkdtemp(join(tmpdir(), 'secure-workspace-'))
@@ -13,7 +14,7 @@ test('扫描、策略和 git diff 使用当前会话工作区，取消后不写�
   await writeFile(join(workspace, 'bad.js'), 'eval(input)\n')
   let observed
   const tools = buildSecureTools(resolveConfig({}, host), host, { async run(argv, options) {
-    observed = options; return { exitCode: 0, signal: null, stdout: '', stderr: '' }
+    observed = options; return { exitCode: 0, signal: null, stdout: gitOutput(argv, options.cwd), stderr: '' }
   } })
   const context = { agent: { session: { header: { cwd: workspace } } } }
   const scan = tools.find(tool => tool.name === 'secure_scan')

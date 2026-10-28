@@ -7,6 +7,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { createHash } from 'node:crypto'
 import { buildSecureTools, resolveConfig, scanPath, scanText, runGitDiff } from '../lib/index.js'
+import { gitOutput } from './git-output.mjs'
 
 const executeFile = promisify(execFile)
 const fixtureRoot = fileURLToPath(new URL('./.tmp/', import.meta.url))
@@ -144,11 +145,11 @@ test('invalid Git parameters and truncated patches cannot replace scan state', a
   }
   await assert.rejects(runGitDiff(rejectedRunner, root, '--quiet'), /base/)
   assert.equal(calls, 0)
-  const truncatedRunner = { async run() {
-    return { exitCode: 0, signal: null, stderr: '', stdout: [
+  const truncatedRunner = { async run(argv, options) {
+    return { exitCode: 0, signal: null, stderr: '', stdout: gitOutput(argv, options.cwd, [
       'diff --git a/a.js b/a.js', '--- a/a.js', '+++ b/a.js',
       '@@ -0,0 +1,2 @@', '+const safe = 1',
-    ].join('\n') }
+    ].join('\n')) }
   } }
   const truncated = buildSecureTools(resolveConfig({}, root), root, truncatedRunner).find(tool => tool.name === 'secure_diff')
   await assert.rejects(truncated.execute({}, {}), /diff.*不完整|diff.*格式无效/)
@@ -214,7 +215,7 @@ const shellQuote = value => "'" + value.replace(/'/g, "'\\''") + "'"
 
 test('runGitDiff 关掉 fsmonitor 并让属性查询落在空树上', async () => {
   const calls = []
-  const capture = { async run(argv) { calls.push(argv); return { exitCode: 0, signal: null, stdout: '', stderr: '' } } }
+  const capture = { async run(argv, options) { calls.push(argv); return { exitCode: 0, signal: null, stdout: gitOutput(argv, options.cwd), stderr: '' } } }
   await runGitDiff(capture, '/fixture/repo', 'HEAD')
   const diffCall = calls.find(argv => argv.includes('diff'))
   assert.ok(diffCall, 'must run git diff')
@@ -270,4 +271,52 @@ test('includeUntracked 的 ls-files 同样不执行被扫仓库的 fsmonitor 命
   assert.equal(result.passed, false)
   assert.deepEqual(result.findings.map(f => f.file), ['untracked.js'])
   await assert.rejects(fs.stat(path.join(root, 'fsmonitor-ran')), { code: 'ENOENT' })
+})
+
+test('core.attributesFile 的 clean 过滤器被隔离，仍扫描到原始危险行', async t => {
+  const { root, git, write, tools } = await project(t, { 'a.js': 'const safe = 1\n' })
+  await write('.git/attributes-fixture', '*.js filter=hidden\n')
+  await write('.git/cleaner.cjs', 'require("node:fs").writeFileSync(require("node:path").join(__dirname,"filter-ran"),"ran");process.stdin.resume();process.stdin.on("end",()=>process.stdout.write("const safe = 1\\n"));')
+  await git('config', 'filter.hidden.clean', shellQuote(process.execPath.replaceAll('\\', '/')) + ' ' + shellQuote(path.join(root, '.git/cleaner.cjs').replaceAll('\\', '/')))
+  await git('config', 'core.attributesFile', path.join(root, '.git/attributes-fixture'))
+  await write('a.js', 'const safe = 1\neval(input)\n')
+  const result = await tools.find(tool => tool.name === 'secure_diff').execute({}, {})
+  assert.equal(result.passed, false)
+  assert.deepEqual(result.findings.map(f => [f.ruleId, f.file, f.line]), [['SEC-001', 'a.js', 2]])
+  await assert.rejects(fs.stat(path.join(root, '.git/filter-ran')), { code: 'ENOENT' })
+  assert.doesNotMatch(await git('diff', 'HEAD'), /eval\(input\)/)
+  assert.equal(await fs.readFile(path.join(root, '.git/filter-ran'), 'utf8'), 'ran')
+})
+
+test('info/attributes 不能触发过滤器或把危险文本当作 binary 跳过；保留先前扫描状态', async t => {
+  const { root, git, write, tools } = await project(t, { 'a.js': 'const safe = 1\n' })
+  await write('a.js', 'const safe = 1\neval(input)\n')
+  const diff = tools.find(tool => tool.name === 'secure_diff')
+  assert.equal((await diff.execute({}, {})).passed, false)
+  const state = path.join(root, '.code-security/state.json'), before = await fs.readFile(state, 'utf8')
+  await write('.git/cleaner.cjs', 'require("node:fs").writeFileSync(require("node:path").join(__dirname,"filter-ran"),"ran");process.stdin.resume();process.stdin.on("end",()=>process.stdout.write("const safe = 1\\n"));')
+  await git('config', 'filter.hidden.clean', shellQuote(process.execPath.replaceAll('\\', '/')) + ' ' + shellQuote(path.join(root, '.git/cleaner.cjs').replaceAll('\\', '/')))
+  for (const rule of ['*.js filter=hidden\n', '*.js -diff\n', '\u00a0#*.js filter=hidden\n']) {
+    await write('.git/info/attributes', rule)
+    await assert.rejects(diff.execute({}, {}), /info\/attributes|incomplete/)
+    assert.equal(await fs.readFile(state, 'utf8'), before)
+  }
+  await assert.rejects(fs.stat(path.join(root, '.git/filter-ran')), { code: 'ENOENT' })
+  await write('.git/info/attributes', '*.js filter=hidden\n')
+  assert.doesNotMatch(await git('diff', 'HEAD'), /eval\(input\)/)
+  assert.equal(await fs.readFile(path.join(root, '.git/filter-ran'), 'utf8'), 'ran')
+  await write('.git/info/attributes', '# comment only\n\n')
+  assert.equal((await diff.execute({}, {})).passed, false)
+})
+
+test('linked worktree 的 common info/attributes 同样不能绕过属性隔离', async t => {
+  const { root, git, write } = await project(t, { 'a.js': 'const safe = 1\n' })
+  const linked = path.join(root, '.linked-fixture')
+  await git('worktree', 'add', '--detach', linked, 'HEAD')
+  try {
+    await fs.writeFile(path.join(linked, 'a.js'), 'eval(input)\n')
+    await write('.git/info/attributes', '*.js -diff\n')
+    const diff = buildSecureTools(resolveConfig({}, linked), linked, runner).find(tool => tool.name === 'secure_diff')
+    await assert.rejects(diff.execute({}, {}), /info\/attributes|incomplete/)
+  } finally { await git('worktree', 'remove', '--force', linked) }
 })

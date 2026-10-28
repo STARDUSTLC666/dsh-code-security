@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { apply } from '../lib/index.js'
+import { gitOutput } from './git-output.mjs'
 
 test('secure_diff preserves the subprocess service receiver', async (t) => {
   const stateDir = mkdtempSync(join(process.cwd(), '.subprocess-test-'))
@@ -14,7 +15,7 @@ test('secure_diff preserves the subprocess service receiver', async (t) => {
       this.internals.calls.push(spec)
       return {
         done: Promise.resolve({ exitCode: 0, signal: null }),
-        collected: { stdout: { readFrom: () => ({ text: '' }) } },
+        collected: { stdout: { readFrom: () => ({ text: gitOutput(spec.argv, spec.cwd) }) } },
         terminate() {},
       }
     },
