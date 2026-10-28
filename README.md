@@ -4,13 +4,13 @@
 
 ![dsh-code-security 鲸鱼娘插件封面](https://raw.githubusercontent.com/STARDUSTLC666/dsh-code-security/master/assets/cover-whale-girl.png)
 
-对代码与 Git 改动进行本地静态安全检查，并追踪修复结果。
+在 DSH 中检查代码与 Git 改动，查看问题证据并复核修复。内置本地静态规则，可选使用 Semgrep、Betterleaks 和 OSV；检查结果区分发现、跳过和未完成项。
 
 [![npm](https://img.shields.io/npm/v/dsh-code-security)](https://www.npmjs.com/package/dsh-code-security) [![downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-code-security-downloads.svg)](https://www.npmjs.com/package/dsh-code-security)
 
 欢迎使用，遇到问题或有改进建议，请提交 [issues](https://github.com/STARDUSTLC666/dsh-code-security/issues) 和 [PR](https://github.com/STARDUSTLC666/dsh-code-security/pulls)。
 
-更新并重启 DSH 后，可从原生侧栏打开新版工作台，原设置入口继续保留。详见[工作台说明与验收范围](docs/WORKBENCH.md)。
+从 DSH 原生侧栏打开工作台；配置与操作边界见[工作台说明](docs/WORKBENCH.md)。
 
 ## 功能
 

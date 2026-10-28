@@ -4,13 +4,13 @@
 
 ![dsh-code-security whale girl plugin cover](https://raw.githubusercontent.com/STARDUSTLC666/dsh-code-security/master/assets/cover-whale-girl.png)
 
-Run local static security checks on code or Git changes and verify fixes.
+Inspect code and Git changes from DSH, review finding evidence and verify fixes. Built-in local rules can be complemented by Semgrep, Betterleaks and OSV, with findings, skips and incomplete checks reported separately.
 
 [![npm](https://img.shields.io/npm/v/dsh-code-security)](https://www.npmjs.com/package/dsh-code-security) [![downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-code-security-downloads.svg)](https://www.npmjs.com/package/dsh-code-security)
 
 Feedback and contributions are welcome: report [issues](https://github.com/STARDUSTLC666/dsh-code-security/issues) or submit [pull requests](https://github.com/STARDUSTLC666/dsh-code-security/pulls).
 
-Open the new native sidebar workbench after updating and restarting DSH. Settings remains available. See the [workbench guide and validation boundaries](docs/WORKBENCH.md).
+Open the workbench from the native DSH sidebar. See the [workbench guide](docs/WORKBENCH.md) for configuration and operating boundaries.
 
 ## What it does
 
