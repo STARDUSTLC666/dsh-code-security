@@ -6,7 +6,9 @@
 
 Inspect code and Git changes from DSH, review finding evidence and verify fixes. Built-in local rules can be complemented by Semgrep, Betterleaks and OSV, with findings, skips and incomplete checks reported separately.
 
-[![npm](https://img.shields.io/npm/v/dsh-code-security)](https://www.npmjs.com/package/dsh-code-security) [![downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-code-security-downloads.svg)](https://www.npmjs.com/package/dsh-code-security)
+[![npm](https://img.shields.io/npm/v/dsh-code-security)](https://www.npmjs.com/package/dsh-code-security) [![downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-code-security-downloads.svg)](https://www.npmjs.com/package/dsh-code-security) [![total downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-code-security-total-downloads.svg)](https://www.npmjs.com/package/dsh-code-security)
+
+[Download statistics](https://github.com/STARDUSTLC666/dsh-suite/blob/npm-downloads/README.md)
 
 Feedback and contributions are welcome: report [issues](https://github.com/STARDUSTLC666/dsh-code-security/issues) or submit [pull requests](https://github.com/STARDUSTLC666/dsh-code-security/pulls).
 
@@ -31,7 +33,10 @@ For the web version, replace `desktop` with `web`. Restart DSH after installatio
 
 ## Start using it
 
-Ask: “Review the current Git diff for security findings, show evidence and recheck the fixes.” Then open **Settings → Code security** to view the project and results.
+1. In the target repository session, choose the whole project or current Git changes.
+2. For example: “Review these changes for security issues; report concrete triggers and code evidence.”
+3. Open Code security in the sidebar and inspect file locations, rules and evidence; prepare optional scanners separately.
+4. Recheck the same scope after fixing it, keeping false-positive reasons and unresolved human decisions.
 
 ## Requirements and configuration
 

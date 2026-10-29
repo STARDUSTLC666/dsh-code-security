@@ -6,7 +6,9 @@
 
 在 DSH 中检查代码与 Git 改动，查看问题证据并复核修复。内置本地静态规则，可选使用 Semgrep、Betterleaks 和 OSV；检查结果区分发现、跳过和未完成项。
 
-[![npm](https://img.shields.io/npm/v/dsh-code-security)](https://www.npmjs.com/package/dsh-code-security) [![downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-code-security-downloads.svg)](https://www.npmjs.com/package/dsh-code-security)
+[![npm](https://img.shields.io/npm/v/dsh-code-security)](https://www.npmjs.com/package/dsh-code-security) [![downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-code-security-downloads.svg)](https://www.npmjs.com/package/dsh-code-security) [![total downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-code-security-total-downloads.svg)](https://www.npmjs.com/package/dsh-code-security)
+
+[下载统计说明](https://github.com/STARDUSTLC666/dsh-suite/blob/npm-downloads/README.md)
 
 欢迎使用，遇到问题或有改进建议，请提交 [issues](https://github.com/STARDUSTLC666/dsh-code-security/issues) 和 [PR](https://github.com/STARDUSTLC666/dsh-code-security/pulls)。
 
@@ -31,7 +33,10 @@ dsh plugin --profile desktop add dsh-code-security
 
 ## 开始使用
 
-安装后可说：“审查当前 Git 改动的安全问题，给出位置和证据，再复查修复结果。”之后可在「设置 → 代码安全」查看项目与检查结果。
+1. 在目标仓库的 DSH 会话中，说明要检查整个项目还是当前 Git 改动。
+2. 例如：“审查当前改动的安全问题，只报告有触发条件和代码证据的结果。”
+3. 从左侧栏“代码安全”打开报告，查看文件、行号、规则与证据；可选扫描器按说明另外准备。
+4. 修复后对同一范围重新检查；保留误报原因和仍待人工判断的项目。
 
 ## 依赖与配置
 
