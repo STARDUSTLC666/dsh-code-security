@@ -1,7 +1,7 @@
 {
   "name": "dsh-code-security",
-  "version": "0.7.4",
-  "description": "对代码与 Git 改动进行本地静态安全检查，并追踪修复结果。",
+  "version": "0.7.5",
+  "description": "DSH 代码安全工作台：本地静态检查、Git 改动审查、证据与修复复核，可选增强扫描器。欢迎提交 issues 和 PR。",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",

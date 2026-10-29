@@ -4,6 +4,11 @@
 
 [历史英文记录](docs/CHANGELOG.en.md)
 
+## 0.7.5 (2026-10-29)
+
+- 同步仓库与 npm 的简明介绍、中英文 README 和反馈入口；本次为文档与包元数据更新。
+- Sync npm descriptions and both README guides with the repository, including issue and pull-request links.
+
 ## 0.7.4 (2026-10-28)
 
 - 补全 Git 属性隔离：屏蔽全局属性文件和系统属性；info/attributes 含有效规则时停止 diff 并提示未完成，可改用全文件扫描。
