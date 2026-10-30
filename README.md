@@ -1,35 +1,44 @@
-# dsh-code-security
+**简体中文** · [English](README.en.md)
 
-[English](README.en.md)
+# Code Security
 
-![dsh-code-security 鲸鱼娘插件封面](https://raw.githubusercontent.com/STARDUSTLC666/dsh-code-security/master/assets/cover-whale-girl.png)
-
-在 DSH 中检查代码与 Git 改动，查看问题证据并复核修复。内置本地静态规则，可选使用 Semgrep、Betterleaks 和 OSV；检查结果区分发现、跳过和未完成项。
+**看清改动中的安全问题，再核对修复结果。**
 
 [![npm](https://img.shields.io/npm/v/dsh-code-security)](https://www.npmjs.com/package/dsh-code-security) [![downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-code-security-downloads.svg)](https://www.npmjs.com/package/dsh-code-security) [![total downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-code-security-total-downloads.svg)](https://www.npmjs.com/package/dsh-code-security)
 
-[下载统计说明](https://github.com/STARDUSTLC666/dsh-suite/blob/npm-downloads/README.md)
+**[安装使用](#安装) · [使用流程](#开始使用) · [完整说明](https://github.com/STARDUSTLC666/dsh-code-security/blob/master/docs/REFERENCE.zh.md)**
 
-欢迎使用，遇到问题或有改进建议，请提交 [issues](https://github.com/STARDUSTLC666/dsh-code-security/issues) 和 [PR](https://github.com/STARDUSTLC666/dsh-code-security/pulls)。
-
-从 DSH 原生侧栏打开工作台；配置与操作边界见[工作台说明](docs/WORKBENCH.md)。
+<picture>
+  <source media="(prefers-color-scheme: dark) and (max-width: 640px)" srcset="https://raw.githubusercontent.com/STARDUSTLC666/dsh-code-security/master/docs/assets/intro/workflow-zh-mobile-dark.svg">
+  <source media="(max-width: 640px)" srcset="https://raw.githubusercontent.com/STARDUSTLC666/dsh-code-security/master/docs/assets/intro/workflow-zh-mobile-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/STARDUSTLC666/dsh-code-security/master/docs/assets/intro/workflow-zh-dark.svg">
+  <img src="https://raw.githubusercontent.com/STARDUSTLC666/dsh-code-security/master/docs/assets/intro/workflow-zh-light.svg" alt="看清改动中的安全问题，再核对修复结果。 · 流程示意" width="100%">
+</picture>
 
 ## 功能
 
-- 扫描文件、目录或 Git diff，报告规则、位置与代码证据。
-- 在 DSH 设置中查看新增问题、检查覆盖、脱敏证据，并复查修复结果。
-- 可选 Betterleaks 密钥检测、Semgrep CE 数据流规则、OSV 依赖漏洞审计。
-- 导出 Markdown / SARIF，维护基线；可按项目开启安静的自动改动检查。
+- 检查文件、目录或 Git 改动。
+- 在工作台查看位置、规则、覆盖范围和脱敏证据。
+- 重新检查同一范围，按需导出 Markdown 或 SARIF。
+
+<details>
+<summary>查看实际示例</summary>
+
+![workbench example](https://raw.githubusercontent.com/STARDUSTLC666/dsh-code-security/master/docs/assets/intro/screen-zh.webp)
+
+图片来自验证环境的真实界面或示例 PPTX 渲染，使用示例数据。
+
+</details>
 
 ## 安装
 
-桌面版可在「插件」面板按包名 `dsh-code-security` 安装。已配置 dsh 命令时也可使用：
+在 DSH 桌面版「插件」面板安装 `dsh-code-security`。已配置命令行时也可使用：
 
 ```bash
 dsh plugin --profile desktop add dsh-code-security
 ```
 
-网页版把命令中的 `desktop` 改为 `web`。安装后重启 DSH。
+网页版把 `desktop` 改为 `web`；安装后重启对应的 DSH。宿主要求以包声明 `>=0.2.1-rc.3` 为准。
 
 ## 开始使用
 
@@ -38,25 +47,32 @@ dsh plugin --profile desktop add dsh-code-security
 3. 从左侧栏“代码安全”打开报告，查看文件、行号、规则与证据；可选扫描器按说明另外准备。
 4. 修复后对同一范围重新检查；保留误报原因和仍待人工判断的项目。
 
-## 依赖与配置
+可以这样说：
 
-默认仅运行本地内置规则。增强程序由用户自行安装，未安装也可使用基础检查。联网依赖审计需明确选择；自动检查默认关闭。完整检测到的密钥会在返回、保存和导出前脱敏。
+> 检查当前 Git 改动的安全问题，给出触发条件、文件位置和代码证据。
 
-详细配置、工具参数与排错见[使用说明](docs/USAGE.md)。从源码独立开发时，Node 要求以 [package.json](package.json) 为准。
+## 开始前要知道
 
-## 文档
+Betterleaks、Semgrep CE 与 OSV 是可选增强；扫描报告不能证明项目没有漏洞。
 
-- [使用与排错](docs/USAGE.md)
-- [更新记录](CHANGELOG.md)
-- [验证范围与历史记录](docs/VALIDATION.md)
-- [问题反馈与功能建议](https://github.com/STARDUSTLC666/dsh-code-security/issues)
+配置、完整工具与排错见[详细使用说明](https://github.com/STARDUSTLC666/dsh-code-security/blob/master/docs/REFERENCE.zh.md)。
 
 ## 插件更新
 
-需要 DSH 0.2.1-rc.3 或更新版本。更新控件直接位于原有工作台内容末尾；没有工作台的插件，位于原生插件详情页底部。检查、更新记录和偏好在原地展开，不增加独立更新页面或设置菜单。自动检查默认开启；**自动安装默认关闭**，明确授权后才会在空闲且没有未保存修改时安装兼容的稳定补丁。开关按插件独立保存，可关闭、推迟或忽略提醒；不会强制重启 DSH、升级 DSH 本体或替换本地源码安装。Suite 组件在当前页面底部明确说明并操作 Suite 整包更新。
+在工作台或原生插件详情页底部检查更新。默认自动检查，**默认不自动安装**；是否安装、何时重启由你决定。Suite 管理的组件随整包更新。[查看更新规则](https://github.com/STARDUSTLC666/dsh-code-security/blob/master/docs/REFERENCE.zh.md)。
 
-旧版用户先在官方插件管理中手动更新一次，之后才会获得此入口。发布到 npm 不会直接替换用户已经安装的版本。
+## 文档
+
+- [详细使用、配置与边界](https://github.com/STARDUSTLC666/dsh-code-security/blob/master/docs/REFERENCE.zh.md)
+- [更新记录](https://github.com/STARDUSTLC666/dsh-code-security/blob/master/CHANGELOG.md)
+- [验证范围与历史](https://github.com/STARDUSTLC666/dsh-code-security/blob/master/docs/VALIDATION.md)
+
+## 反馈与贡献
+
+如果插件帮到了你，欢迎 Star，让更多人发现它。问题和建议请提交 [Issues](https://github.com/STARDUSTLC666/dsh-code-security/issues)，也欢迎代码与文档 [PR](https://github.com/STARDUSTLC666/dsh-code-security/pulls)。反馈时附上版本与复现步骤，并移除凭据。
 
 ## License
 
-[MIT](LICENSE)
+[MIT](https://github.com/STARDUSTLC666/dsh-code-security/blob/master/LICENSE)
+
+<a id="依赖与配置"></a>

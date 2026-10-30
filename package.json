@@ -1,7 +1,7 @@
 {
   "name": "dsh-code-security",
-  "version": "0.7.7",
-  "description": "DSH 代码安全工作台：本地静态检查、Git 改动审查、证据与修复复核，可选增强扫描器。欢迎提交 issues 和 PR。",
+  "version": "0.7.8",
+  "description": "看清改动中的安全问题，再核对修复结果。 Betterleaks、Semgrep CE 与 OSV 是可选增强 欢迎提交 issues 和 PR。",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
