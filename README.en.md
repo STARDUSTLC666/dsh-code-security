@@ -1,35 +1,35 @@
-# dsh-code-security
+[简体中文](README.md) · **English**
 
-[中文](README.md)
+# Code Security
 
-![dsh-code-security whale girl plugin cover](https://raw.githubusercontent.com/STARDUSTLC666/dsh-code-security/master/assets/cover-whale-girl.png)
-
-Inspect code and Git changes from DSH, review finding evidence and verify fixes. Built-in local rules can be complemented by Semgrep, Betterleaks and OSV, with findings, skips and incomplete checks reported separately.
+**Inspect security findings and verify the fixes.**
 
 [![npm](https://img.shields.io/npm/v/dsh-code-security)](https://www.npmjs.com/package/dsh-code-security) [![downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-code-security-downloads.svg)](https://www.npmjs.com/package/dsh-code-security) [![total downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-code-security-total-downloads.svg)](https://www.npmjs.com/package/dsh-code-security)
 
-[Download statistics](https://github.com/STARDUSTLC666/dsh-suite/blob/npm-downloads/README.md)
+**[Install](#install) · [Workflow](#start-using-it) · [Full guide](https://github.com/STARDUSTLC666/dsh-code-security/blob/master/docs/REFERENCE.en.md)**
 
-Feedback and contributions are welcome: report [issues](https://github.com/STARDUSTLC666/dsh-code-security/issues) or submit [pull requests](https://github.com/STARDUSTLC666/dsh-code-security/pulls).
+<picture>
+  <source media="(prefers-color-scheme: dark) and (max-width: 640px)" srcset="https://raw.githubusercontent.com/STARDUSTLC666/dsh-code-security/master/docs/assets/intro/workflow-en-mobile-dark.svg">
+  <source media="(max-width: 640px)" srcset="https://raw.githubusercontent.com/STARDUSTLC666/dsh-code-security/master/docs/assets/intro/workflow-en-mobile-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/STARDUSTLC666/dsh-code-security/master/docs/assets/intro/workflow-en-dark.svg">
+  <img src="https://raw.githubusercontent.com/STARDUSTLC666/dsh-code-security/master/docs/assets/intro/workflow-en-light.svg" alt="Inspect security findings and verify the fixes. · workflow illustration" width="100%">
+</picture>
 
-Open the workbench from the native DSH sidebar. See the [workbench guide](docs/WORKBENCH.md) for configuration and operating boundaries.
+## Features
 
-## What it does
-
-- Scan files, directories or Git diffs with locations and code evidence.
-- Inspect new findings, coverage and redacted evidence in DSH Settings, then recheck fixes.
-- Optionally use Betterleaks for secrets, Semgrep CE for data flow and OSV for dependency advisories.
-- Export Markdown/SARIF, maintain baselines, and opt into quiet per-project change checks.
+- Scan files, directories or a Git diff.
+- Inspect locations, rules, coverage and redacted evidence.
+- Recheck the same scope and export Markdown or SARIF when needed.
 
 ## Install
 
-In DSH Desktop, install `dsh-code-security` from the Plugins panel. If the bundled dsh command is available:
+Open **Plugins** in the DSH desktop app and install `dsh-code-security`. If the CLI is available:
 
 ```bash
 dsh plugin --profile desktop add dsh-code-security
 ```
 
-For the web version, replace `desktop` with `web`. Restart DSH after installation.
+For the web profile, replace `desktop` with `web`. Restart that DSH profile after installation. The package’s DSH requirement is `>=0.2.1-rc.3`.
 
 ## Start using it
 
@@ -38,25 +38,33 @@ For the web version, replace `desktop` with `web`. Restart DSH after installatio
 3. Open Code security in the sidebar and inspect file locations, rules and evidence; prepare optional scanners separately.
 4. Recheck the same scope after fixing it, keeping false-positive reasons and unresolved human decisions.
 
-## Requirements and configuration
+Example request：
 
-Built-in rules run locally by default. Optional programs are installed by the user; basic checks work without them. Online dependency audits require an explicit mode choice, and automatic checks are off by default. Complete detected credentials are redacted before return, persistence and export.
+> Check the current Git diff for security findings with triggers, locations and code evidence.
 
-Detailed configuration, tool arguments and troubleshooting are in the [usage guide](docs/USAGE.en.md). For standalone development, follow the Node requirement in [package.json](package.json).
+## Before you start
 
-## Documentation
+Betterleaks, Semgrep CE and OSV are optional additions; a scan does not prove the absence of vulnerabilities.
 
-- [Usage and troubleshooting](docs/USAGE.en.md)
-- [Changelog](CHANGELOG.md)
-- [Validation scope and history](docs/VALIDATION.md)
-- [Report a problem or suggest a feature](https://github.com/STARDUSTLC666/dsh-code-security/issues)
+Configuration, detailed tools and troubleshooting: [full reference](https://github.com/STARDUSTLC666/dsh-code-security/blob/master/docs/REFERENCE.en.md).
 
 ## Plugin updates
 
-Requires DSH 0.2.1-rc.3 or newer. Update controls sit at the bottom of the existing workbench, or native plugin details for plugins without a workbench. Checks, release notes and preferences expand in place, with no separate update page or settings menu. Automatic checks are on by default; **automatic installation is off by default**. Only explicit opt-in permits compatible stable patches while idle with no unsaved changes. Preferences are independent, with per-plugin disable, deferral and ignore controls. No forced DSH restart or upgrade, and local-source installations stay unchanged. Suite components explain and operate on the whole Suite in the same footer.
+Check updates at the bottom of the workbench or native plugin details. Automatic checks are on by default; **automatic installation is off**. You choose whether to install and when to restart. Suite-managed components update with their bundle. [Update behavior](https://github.com/STARDUSTLC666/dsh-code-security/blob/master/docs/REFERENCE.en.md).
 
-Older releases need one manual update in native plugin management to acquire these controls. Publishing to npm does not replace an existing user installation.
+## Documentation
+
+- [Full usage, configuration and limits](https://github.com/STARDUSTLC666/dsh-code-security/blob/master/docs/REFERENCE.en.md)
+- [Release notes](https://github.com/STARDUSTLC666/dsh-code-security/blob/master/CHANGELOG.md)
+- [Validation scope and history](https://github.com/STARDUSTLC666/dsh-code-security/blob/master/docs/VALIDATION.md)
+
+## Feedback and contributions
+
+If the plugin helps, a Star makes it easier for others to discover. Report problems or suggest improvements in [Issues](https://github.com/STARDUSTLC666/dsh-code-security/issues); code and documentation [PRs](https://github.com/STARDUSTLC666/dsh-code-security/pulls) are welcome. Include versions and reproduction steps, and remove credentials from reports.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](https://github.com/STARDUSTLC666/dsh-code-security/blob/master/LICENSE)
+
+<a id="what-it-does"></a>
+<a id="requirements-and-configuration"></a>

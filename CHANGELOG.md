@@ -1,11 +1,18 @@
 # 更新记录
 
-## 0.7.8 (2026-11-03)
+## 0.7.9 (2026-11-03)
 
 - 工作台展示 secure_health 的检查项；切换项目显示载入反馈；使用说明补齐排错。
 - The workbench shows secure_health checks, switching projects shows loading feedback, and troubleshooting docs are added.
 - 同步共享 workbench-ui v1.1：Page 外的 Empty / Dialog / Status 自带样式与 `.dshw` 主题作用域，Status 新增 warn 色调。
 - Sync workbench-ui v1.1: Empty / Dialog / Status now carry their own styles and `.dshw` theme scope outside Page, and Status gains a warn tone.
+
+## 0.7.8 (2026-10-30)
+
+- 重整中英文首页：用途、三步流程图、安装入口与操作示例；详细配置与边界集中到完整说明。
+- 保留下载统计、独立更新选择、问题反馈和贡献入口；原封面与运行功能保留。
+- Refresh bilingual landing pages, workflow artwork, quick starts and reference navigation.
+
 
 ## 0.7.7 (2026-10-30)
 
