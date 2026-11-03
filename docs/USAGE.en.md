@@ -93,6 +93,18 @@ Policy file: `.code-security.json`.
 
 Git runs with external diff/textconv disabled, and the reviewed repository's own executable config is neutralised too: every git call passes `-c core.fsmonitor=false`, and diff runs with `--attr-source=<empty tree>` so the worktree `.gitattributes` no longer applies (a `filter.<driver>.clean` is neither executed nor able to rewrite the diff). `--attr-source` needs Git 2.40+; older versions fall back to disabling fsmonitor only. Paths are relative to the session workspace. Staged scans read the index and only added-line findings are reported. Invalid arguments, Git refs and incomplete hunks preserve previous state.
 
+## Troubleshooting
+
+Run `secure_health`, or click Check tools under Tools and settings in the workbench. It makes no network requests and reports each engine's status and version, the built-in size limits and severity gate, the state directory, the current working directory, and which engines are actually selected.
+
+- **An engine shows Not installed**: built-in rules still work. If you installed the optional tool, set its executable path or add it to PATH, then click Check tools again and confirm it reads Completed.
+- **A check is incomplete or partial**: that is not a pass and closes no previous finding. Narrow the scope and rerun the same check.
+- **Recheck marked nothing as fixed**: only a complete recheck closes findings; a rule no longer matching is separate from the reviewed project's tests passing.
+- **No project listed**: ask for a check inside that project chat first (for example "check the current diff for security issues") and it appears in the selector. A corrupt workspace index is preserved on disk and reported explicitly.
+- **Dependency audit says the offline database is unavailable**: OSV 2.7 reads `osv-scalibr/npm/all.zip` under the cache directory and expects you to download it first; alternatively choose the online audit, which only sends package names, versions and dependency metadata.
+- **Open file fails**: it needs the corresponding chat session. Use Copy location to get `file:line` instead, or download the SARIF / Markdown report.
+- **An export only contains the latest result**: `secure_export` exports the check currently stored in state; rerun before exporting after changing the target.
+
 ## Development and licenses
 
 Run `pnpm test`. Without native executable paths, the three native integration tests are explicitly skipped. Separate CI jobs install pinned, checksum-verified engines on Windows/Linux and use a synthetic offline OSV database.

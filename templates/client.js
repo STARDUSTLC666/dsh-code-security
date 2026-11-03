@@ -54,11 +54,11 @@ function FindingCard({finding,fresh,onOpen,onCopy}) {
 }
         function Workbench({workbench=false}={}) {
 const [activeTab,setActiveTab]=useState('findings'),[switchTo,setSwitchTo]=useState(''); const controlId=React.useId();
-            const [, repaint] = useState(0), [catalog, setCatalog] = useState([]), [id, setId] = useState(''), [data, setData] = useState(null), [settings, setSettings] = useState({ engines: ['builtin'], enginePaths: {} }), [autoCheck, setAutoCheck] = useState(false), [dirty, setDirty] = useState(false), [job, setJob] = useState(null), [result, setResult] = useState(null), [error, setError] = useState(''), [notice, setNotice] = useState(''), [loading, setLoading] = useState(true), [mode, setMode] = useState('none'), [filter, setFilter] = useState('all'), [limit, setLimit] = useState(50);
+            const [, repaint] = useState(0), [catalog, setCatalog] = useState([]), [id, setId] = useState(''), [data, setData] = useState(null), [settings, setSettings] = useState({ engines: ['builtin'], enginePaths: {} }), [autoCheck, setAutoCheck] = useState(false), [dirty, setDirty] = useState(false), [job, setJob] = useState(null), [result, setResult] = useState(null), [error, setError] = useState(''), [notice, setNotice] = useState(''), [loading, setLoading] = useState(true), [pendingId, setPendingId] = useState(''), [mode, setMode] = useState('none'), [filter, setFilter] = useState('all'), [limit, setLimit] = useState(50);
             const generation = useRef(0), mounted = useRef(true), requests = useRef(new Set());
             function request(body) { const ctl = new AbortController(); requests.current.add(ctl); return action(body, ctl.signal).finally(() => requests.current.delete(ctl)); }
             async function open(selected, keepResult = false) { const seq = ++generation.current; if (!keepResult)
-                setError(''); setLoading(true); try {
+                setError(''); setLoading(true); setPendingId(String(selected)); try {
                 const value = await request({ operation: 'open', id: selected });
                 if (!mounted.current || seq !== generation.current)
                     return;
@@ -77,8 +77,10 @@ const [activeTab,setActiveTab]=useState('findings'),[switchTo,setSwitchTo]=useSt
                     setError(message(e.message));
             }
             finally {
-                if (mounted.current && seq === generation.current)
+                if (mounted.current && seq === generation.current) {
                     setLoading(false);
+                    setPendingId('');
+                }
             } }
             useEffect(() => { mounted.current = true; const off = locale?.subscribe?.(() => repaint(n => n + 1)); request({ operation: 'list' }).then(value => { if (!mounted.current)
                 return; setCatalog(value.workspaces); if (value.workspaces[0])
@@ -180,6 +182,7 @@ __stardustUpdatesGuard(React, "dsh-code-security", { dirty, busy: busy || loadin
  h(W.Button,{disabled:disabled || !report?.hasScan,onClick:()=>run('verify')},t('复查修复','Recheck fixes')),h(W.IconButton,{icon:'refresh',label:t('刷新结果','Refresh results'),disabled:busy || loading || dirty,onClick:()=>open(id)})) : null},
  h('style',null,css),h('style',null,SECURITY_WORKBENCH_CSS),h(W.Status,{tone:'error'},error),h(W.Status,{tone:'success'},notice),
  catalog.length ? h('div',{className:'security-project'},h('label',{htmlFor:controlId+'-project'},t('项目','Project')),h('select',{id:controlId+'-project',value:id,disabled:loading,onChange:event=>{if(dirty)setSwitchTo(event.target.value);else void open(event.target.value);}},catalog.map(w=>h('option',{key:w.id,value:w.id},w.label+' — '+w.root)))) : null,
+loading && data && pendingId && pendingId !== id ? h(W.Status,null,t('正在载入所选项目，载入完成前下面是上一个项目的结果。','Loading the selected project. The results below are still from the previous project until it finishes.')) : null,
  busy ? h(W.Status,null,t('正在检查，可以关闭面板，稍后回来查看结果。','Checking. You can close this panel and return for the result.'),h(W.Button,{onClick:()=>request({operation:'cancel',id,job:job.id}).catch(e=>setError(message(e.message)))},t('取消检查','Cancel check'))) : null,
  result?.coverage && 'closedCount' in result && result.complete === false ? h(Coverage, { rows: Array.isArray(result.coverage) ? result.coverage : [result.coverage] }) : null,
 result?.configurationError ? h('div', { className: 'secw-error', role: 'alert' }, message(result.configurationError)) : null,
@@ -199,6 +202,7 @@ data?.automatic ? h('p', { className: 'secw-muted' }, data.automatic.problem ? t
 h('div', { className: 'secw-tools' }, h('button', { disabled: busy || !dirty, onClick: save }, t('保存设置', 'Save settings')), h('button', { disabled: busy || !dirty, onClick: () => { setSettings(data.settings); setAutoCheck(data.workspace.autoCheck); setDirty(false); } }, t('取消修改', 'Cancel edits')), h('button', { disabled, onClick: () => run('health') }, t('检查工具', 'Check tools'))),
 dirty ? h('p', { className: 'secw-muted' }, t('设置尚未保存，请保存后再检查。', 'Save your settings before starting a check.')) : null,
 result?.engines ? h(Coverage, { rows: result.engines }) : null,
+result?.checks ? h(HealthReport, { result }) : null,
 result?.database ? h('div', null, h('p', { className: 'secw-file' }, result.database.directory), result.database.available ? result.database.databases.map(db => h('p', { key: db.ecosystem, className: 'secw-muted' }, db.ecosystem + ' · ' + t('缓存文件修改时间：', 'Cache file modified: ') + new Date(db.fileModifiedAt).toLocaleString(english() ? 'en-US' : 'zh-CN'))) : h('p', { className: 'secw-muted' }, t('未找到离线漏洞库。', 'No offline database was found.')), h('p', { className: 'secw-muted' }, t('文件时间不代表库中每条漏洞的更新日期。', 'A file timestamp does not establish the freshness of every advisory.'))) : null) : activeTab === 'dependencies' ? h('section',{className:'security-settings'},h('h3',null,t('依赖与已知漏洞','Dependencies and known vulnerabilities')),h('label', { htmlFor: controlId+'-audit' }, t('检查方式', 'Check mode')),
 h('select', { id: controlId+'-audit', value: mode, disabled: busy, onChange: e => setMode(e.target.value) }, h('option', { value: 'none' }, t('仅列出依赖（离线）', 'Dependency inventory (offline)')), h('option', { value: 'offline' }, t('已知漏洞（本地数据库）', 'Known vulnerabilities (local database)')), h('option', { value: 'online' }, t('已知漏洞（联网）', 'Known vulnerabilities (online)'))),
 h('p', { className: 'secw-muted' }, mode === 'online' ? t('联网审计会向 OSV 查询包名、版本等依赖信息；不上传源码。', 'Online auditing queries OSV with package names, versions and dependency metadata; source code is not uploaded.') : t('清单检查只看依赖声明，不代表不存在已知漏洞。离线漏洞审计需要预先下载数据库。', 'An inventory is not a vulnerability audit. Offline auditing requires a previously downloaded database.')),
