@@ -1,5 +1,12 @@
 # 更新记录
 
+## 0.7.11 (2026-11-06)
+
+- 结果顶部显示最近检查时间、范围和方式，说明保存记录与“新增”命中的含义，避免把旧报告误认为升级后新发现的漏洞。
+- 高熵检测区分带摘要字段名的 SHA 摘要、版本化用途标识与 URL 路径；同样内容放入凭据字段或未知上下文时仍需核对，测试目录不会自动豁免。
+- 私钥基线指纹绑定完整材料；替换或新增私钥后重新提示，报告仍全程脱敏。旧版仅按 BEGIN 行保存的私钥基线需重新核对一次。
+- Show saved scan time and scope, reduce structured public-metadata false positives, and bind private-key acceptance to full material without exposing it.
+
 ## 0.7.10 (2026-11-04)
 
 - 同步共享界面：嵌入设置时继承宿主底色，输入框跟随主题，空状态保持可读宽度；新版 DSH 可显示插件设置图标。

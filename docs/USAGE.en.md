@@ -16,6 +16,10 @@ Projects come from host sessions or completed security tools; the browser cannot
 
 Findings show severity, confidence, rule, location, source engines and redacted evidence. Filter new/high-risk findings, copy locations, download SARIF/Markdown, or open a file while its corresponding project chat is active.
 
+The report header shows the saved scan time, scope and mode. Updating the plugin does not rerun old reports. “New” means a finding is absent from the accepted baseline, not that a vulnerability just appeared.
+
+Synthetic test passwords, mock API keys and localhost TLS fixture keys can match credential rules. Review each use before accepting evidence; do not silence every test directory or accept everything without checking. Changed evidence is reviewed again. Version 0.7.11 binds private-key fingerprints to full material, so older header-only acceptances need one new review. Structured public digests, versioned purpose identifiers and routes reduce entropy warnings only in matching non-credential contexts.
+
 ## Optional engines
 
 | Engine | Coverage | Default |

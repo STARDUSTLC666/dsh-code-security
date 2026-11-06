@@ -19,6 +19,12 @@ function SecurityResults({ report, findings, fresh, filter, setFilter, limit, se
   if (loading && !report) return h(W.Empty, { title: t('正在载入…', 'Loading…'), icon: 'shield' });
   if (!report?.hasScan) return h(W.Empty, { title: t('尚未检查此项目', 'This project has not been checked'), icon: 'shield' }, t('选择上方的检查方式开始。内置规则无需额外安装。', 'Choose a check above. Built-in rules need no extra installation.'));
   return h(React.Fragment, null,
+    h('div', { className: 'security-report-meta' },
+      h('p', { className: 'w-muted' }, h('strong', null, t('最近检查：', 'Last checked: ')),
+        report.time && Number.isFinite(Date.parse(report.time)) ? h('time', { dateTime: report.time }, new Date(report.time).toLocaleString(english() ? 'en-US' : 'zh-CN')) : t('时间未知', 'Unknown time'),
+        ' · ' + t('范围：', 'Scope: ') + (report.scope?.target || report.target || '.'),
+        ' · ' + (report.scope?.kind === 'diff' || String(report.mode || '').startsWith('diff') ? t('Git 改动', 'Git changes') : t('文件扫描', 'File scan'))),
+      h('p', { className: 'w-muted' }, t('这是保存的检查结果，更新插件不会自动重扫。“新增”指尚未接受的命中，测试夹具和公开常量需核对用途。', 'These are saved results; plugin updates do not rerun checks. “New” means not accepted in the baseline. Review test fixtures and public constants in context.'))),
     h(W.Status, null, h('strong', null, report.complete === false ? t('检查未完成', 'Check incomplete') : report.passed ? t('未发现达到阈值的新增问题', 'No new findings reached the threshold') : t('有问题需要核对', 'Findings need review')),
       ' · ' + t('新增 ', 'New ') + Object.values(report.newCounts || {}).reduce((a, b) => a + Number(b), 0) + ' · ' + t('已接受 ', 'Accepted ') + Object.values(report.acceptedCounts || {}).reduce((a, b) => a + Number(b), 0)),
     h(W.Split, { listWidth: 370, selected: selectedId && findings.some(finding => finding.id === selectedId) ? selectedId : null, onBack: () => setSelectedId(null), backLabel: t('返回问题列表', 'Back to findings'),
@@ -30,7 +36,7 @@ function SecurityResults({ report, findings, fresh, filter, setFilter, limit, se
         (report.findingsTotal ?? 0) > 200 ? h('p', { className: 'w-muted security-list-note' }, t('面板最多展示 200 项，完整结果请导出报告。', 'The panel shows up to 200 findings. Export the full report for all results.')) : null),
       detail: h(React.Fragment, null,
         active ? h(FindingCard, { key: active.id, finding: active, fresh: fresh.has(active.id), onOpen, onCopy }) : h(W.Empty, { title: t('没有匹配的问题', 'No matching findings'), icon: 'shield' }),
-        h('details', { className: 'w-section' }, h('summary', null, t('检查覆盖范围', 'Check coverage')), h(Coverage, { rows: report.coverage }), report.time ? h('p', { className: 'w-muted' }, new Date(report.time).toLocaleString(english() ? 'en-US' : 'zh-CN')) : null),
+        h('details', { className: 'w-section' }, h('summary', null, t('检查覆盖范围', 'Check coverage')), h(Coverage, { rows: report.coverage })),
         h('div', { className: 'w-detail-footer' }, h(W.Button, { icon: 'download', disabled: busy, onClick: () => download('sarif') }, t('下载 SARIF', 'Download SARIF')), h(W.Button, { icon: 'download', disabled: busy, onClick: () => download('markdown') }, t('下载 Markdown', 'Download Markdown')))) }));
 }
 

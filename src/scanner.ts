@@ -10,7 +10,7 @@ import { createHash } from 'node:crypto'
 import { DEFAULT_EXCLUDE_DIRS, type Severity } from './config.js'
 import { languageForFile, RULES, type SecurityRule } from './rules.js'
 import { policyExcludesDir, policyIgnores, type SecurePolicy } from './policy.js'
-import { protectFinding, isHighEntropyToken } from './privacy.js'
+import { protectFinding, isHighEntropyToken, evidenceFingerprint } from './privacy.js'
 import { sanitizedHtmlLines } from './syntax.js'
 
 export interface Finding {
@@ -90,11 +90,22 @@ function shouldScanFile(file: string): boolean {
 
 const TOKEN_PATTERN = /['"]([A-Za-z0-9+/=_-]{24,})['"]/g
 
+/** Only dismiss structured public metadata in its matching, non-credential context. */
+function publicMetadata(token: string, prefix: string): boolean {
+  const binding = /([\w$-]+)["']?\s*[:=]\s*$/.exec(prefix)?.[1] ?? ''
+  if (/(?:password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|authorization|credential)/i.test(binding)) return false
+  const digest = /sha(256|384|512)$/i.exec(binding)
+  if (digest !== null && new RegExp('^[a-f0-9]{' + Number(digest[1]) / 4 + '}$', 'i').test(token)) return true
+  if (/^(?:entropy|purpose|namespace)$/i.test(binding) && /^[a-z][a-z-]+\/[a-z][a-z0-9-]+\/v\d+$/.test(token)) return true
+  const routeContext = /^(?:path|route|endpoint|url|pathname)$/i.test(binding) || /\bfetch\([^,]*$/.test(prefix)
+  return routeContext && /^\/(?:[a-z-]+\/)*v\d+\/(?:[a-z-]+\/)+$/.test(token)
+}
+
 function detectHighEntropy(line: string, lineNumber: number, rel: string, rule: SecurityRule): Finding[] {
   const findings: Finding[] = []
   for (const match of line.matchAll(TOKEN_PATTERN)) {
     const token = match[1]!
-    if (!isHighEntropyToken(token)) continue
+    if (!isHighEntropyToken(token) || publicMetadata(token, line.slice(0, match.index))) continue
     const id = makeId(rule.id, rel, lineNumber, token.slice(0, 32))
     findings.push({
       id,
@@ -142,10 +153,24 @@ function scanFileRule(entries: LineEntry[], rel: string, rule: SecurityRule, dis
     if (best === undefined) return undefined
     const line = block[best.start]!.line
     const snippet = block.slice(best.start, best.end + 1).map(entry => entry.text).join('\n')
+    let fingerprint: string | undefined
+    if (rule.id === 'SEC-303') {
+      // The BEGIN line is identical for unrelated keys. Bind acceptance to the
+      // complete material before redaction, so replacing a fixture cannot hide a key.
+      const original = entries.findIndex(entry => entry.line === line)
+      const contiguous: string[] = []
+      for (let index = original; index < entries.length; index++) {
+        if (index > original && entries[index]!.line !== entries[index - 1]!.line + 1) break
+        contiguous.push(entries[index]!.text)
+      }
+      const material = contiguous.join('\n').match(/-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----[\s\S]*?(?:-----END (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----|$)/g) ?? [snippet]
+      fingerprint = evidenceFingerprint({ ruleId: rule.id, file: rel, snippet: material.join('\n') })
+    }
     return {
       id: makeId(rule.id, rel, line, snippet), ruleId: rule.id, title: rule.title,
       cwe: rule.cwe, severity: rule.severity, confidence: rule.confidence,
       file: rel, line, snippet: snippet.trim().slice(0, 200), message: rule.message,
+      ...(fingerprint === undefined ? {} : { fingerprint }),
     }
   }
   for (const entry of entries) {

@@ -325,7 +325,7 @@ function buildWorkspaceTools(cfg: ResolvedSecureConfig, cwd: string, runner: Pro
       const split = splitByBaseline(last.findings, state.baseline)
       return {
         hasScan: true,
-        time: last.time, scope: last.scope, engines: last.engines ?? ['builtin'],
+        time: last.time, target: last.target, mode: last.mode, scope: last.scope, engines: last.engines ?? ['builtin'],
         stateFile: stateDir,
         policy,
         counts: last.counts,
