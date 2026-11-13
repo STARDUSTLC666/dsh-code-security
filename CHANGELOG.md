@@ -1,5 +1,10 @@
 # 更新记录
 
+## 0.7.12 (2026-11-14)
+
+- 适配 DSH 0.2.2-rc.3：最低 Harness 版本声明提升至 0.2.2-rc.3，运行时代码未变。
+- Support DSH 0.2.2-rc.3: raise the minimum Harness declaration to 0.2.2-rc.3; runtime code is unchanged.
+
 ## 0.7.11 (2026-11-06)
 
 - 结果顶部显示最近检查时间、范围和方式，说明保存记录与“新增”命中的含义，避免把旧报告误认为升级后新发现的漏洞。
