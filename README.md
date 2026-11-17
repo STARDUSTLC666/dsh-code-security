@@ -4,6 +4,8 @@
 
 **看清改动中的安全问题，再核对修复结果。**
 
+DeepSeek Harness（`>=0.2.2-rc.3`）代码安全工作台：支持本地静态扫描、Git 改动审查、依赖漏洞检查与修复复核，可选接入 Betterleaks / Semgrep CE / OSV-Scanner。工作台内置 5 套明亮可切换界面风格（原生清透 / 米白纸感 / Claude 暖书卷 / 8-Bit 像素 / 晴空薄荷，深色模式自动柔和适配）与按钮微交互动效，跨插件实时同步。
+
 [![npm](https://img.shields.io/npm/v/dsh-code-security)](https://www.npmjs.com/package/dsh-code-security) [![downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-code-security-downloads.svg)](https://www.npmjs.com/package/dsh-code-security) [![total downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-code-security-total-downloads.svg)](https://www.npmjs.com/package/dsh-code-security)
 
 **[安装使用](#安装) · [使用流程](#开始使用) · [完整说明](https://github.com/STARDUSTLC666/dsh-code-security/blob/master/docs/REFERENCE.zh.md)**
@@ -17,9 +19,10 @@
 
 ## 功能
 
-- 检查文件、目录或 Git 改动。
-- 在工作台查看位置、规则、覆盖范围和脱敏证据。
-- 重新检查同一范围，按需导出 Markdown 或 SARIF。
+- 检查文件、目录或 Git 改动，并对依赖清单执行离线清单或 OSV 漏洞检查。
+- 在适配 DeepSeek Harness `>=0.2.2-rc.3` 的 Workbench UI v2 工作台中查看位置、规则、覆盖范围和脱敏证据。
+- 顶部支持 5 套工作台风格一键切换（原生清透 / 米白纸感 / Claude 暖书卷 / 8-Bit 像素 / 晴空薄荷），配有微交互动效与减少动态效果适配。
+- 重新检查同一范围核对修复，按需导出 Markdown 或 SARIF 报告。
 
 <details>
 <summary>查看实际示例</summary>

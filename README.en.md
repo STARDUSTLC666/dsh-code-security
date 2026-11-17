@@ -4,6 +4,8 @@
 
 **Inspect security findings and verify the fixes.**
 
+Code security workbench for DeepSeek Harness (`>=0.2.2-rc.3`): local static checks, Git diff review, dependency auditing, and fix verification with optional Betterleaks / Semgrep CE / OSV-Scanner integration. Features Workbench UI v2 with 5 synced light/warm themes (Native Airy / Warm Cream / Claude Warmth / Bright 8-Bit / Airy Mint), soft-slate dark adaptation, and tactile micro-animations.
+
 [![npm](https://img.shields.io/npm/v/dsh-code-security)](https://www.npmjs.com/package/dsh-code-security) [![downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-code-security-downloads.svg)](https://www.npmjs.com/package/dsh-code-security) [![total downloads](https://raw.githubusercontent.com/STARDUSTLC666/dsh-suite/npm-downloads/assets/dsh-code-security-total-downloads.svg)](https://www.npmjs.com/package/dsh-code-security)
 
 **[Install](#install) · [Workflow](#start-using-it) · [Full guide](https://github.com/STARDUSTLC666/dsh-code-security/blob/master/docs/REFERENCE.en.md)**
@@ -17,9 +19,10 @@
 
 ## Features
 
-- Scan files, directories or a Git diff.
-- Inspect locations, rules, coverage and redacted evidence.
-- Recheck the same scope and export Markdown or SARIF when needed.
+- Scan files, directories, or a Git diff, and audit dependency manifests offline or against OSV.
+- Inspect locations, rules, coverage, and redacted evidence in a DeepSeek Harness `>=0.2.2-rc.3` Workbench UI v2 panel.
+- Switch between 5 synced workbench themes (Native Airy, Warm Cream, Claude Warmth, Bright 8-Bit, Airy Mint) with micro-animations and reduced-motion support.
+- Recheck the same scope after fixes and export Markdown or SARIF reports when needed.
 
 ## Install
 
