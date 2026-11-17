@@ -24,6 +24,15 @@ Code security workbench for DeepSeek Harness (`>=0.2.2-rc.3`): local static chec
 - Switch between 5 synced workbench themes (Native Airy, Warm Cream, Claude Warmth, Bright 8-Bit, Airy Mint) with micro-animations and reduced-motion support.
 - Recheck the same scope after fixes and export Markdown or SARIF reports when needed.
 
+<details>
+<summary>See an example</summary>
+
+![workbench example](https://raw.githubusercontent.com/STARDUSTLC666/dsh-code-security/master/docs/assets/intro/screen-en.webp)
+
+Captured from the live DeepSeek Harness workbench using demo data.
+
+</details>
+
 ## Install
 
 Open **Plugins** in the DSH desktop app and install `dsh-code-security`. If the CLI is available:

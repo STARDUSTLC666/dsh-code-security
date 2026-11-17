@@ -29,7 +29,7 @@ DeepSeek Harness（`>=0.2.2-rc.3`）代码安全工作台：支持本地静态�
 
 ![workbench example](https://raw.githubusercontent.com/STARDUSTLC666/dsh-code-security/master/docs/assets/intro/screen-zh.webp)
 
-图片来自验证环境的真实界面或示例 PPTX 渲染，使用示例数据。
+图片来自验证环境的真实工作台界面，使用示例数据。
 
 </details>
 
