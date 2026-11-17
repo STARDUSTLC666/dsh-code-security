@@ -1,5 +1,10 @@
 # 更新记录
 
+## 0.7.14 (2026-11-17)
+
+- 版本与更新随当前工作台内容滚动，展开更新选项时保留工具设置和检查结果的可操作空间。
+- Scroll the update controls with the active workbench tab so expanded options leave room for settings and findings.
+
 ## 0.7.13 (2026-11-17)
 
 - 在工作台单独检查和安装兼容版本。自动安装默认关闭，可为该插件开启空闲时的稳定补丁更新。

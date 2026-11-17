@@ -57,7 +57,7 @@ function createWorkbenchUI(React) {
       h('header', { className: 'w-page-header' }, h('div', { className: 'w-heading' }, h('h1', null, title), subtitle ? h('p', { className: 'w-subtitle' }, subtitle) : null), actions ? h('div', { className: 'w-header-actions' }, actions) : null),
       h('div', { className: 'w-body' }, children));
   }
-  function Tabs({ items, value, onChange, label, children }) {
+  function Tabs({ items, value, onChange, label, children, footer }) {
     const id = useId();
     const active = items.some(item => item.id === value) ? value : items[0]?.id;
     function keys(event, index) {
@@ -72,7 +72,7 @@ function createWorkbenchUI(React) {
         type: 'button', role: 'tab', key: item.id, id: id + '-' + item.id, 'aria-controls': id + '-panel', 'aria-selected': active === item.id, tabIndex: active === item.id ? 0 : -1,
         onClick: () => onChange(item.id), onKeyDown: event => keys(event, index),
       }, item.label, item.count !== undefined ? h('span', { className: 'w-count' }, item.count) : null))),
-      h('div', { className: 'w-tab-panel', id: id + '-panel', role: 'tabpanel', 'aria-labelledby': id + '-' + active }, children));
+      h('div', { className: 'w-tab-panel', id: id + '-panel', role: 'tabpanel', 'aria-labelledby': id + '-' + active }, children, footer));
   }
   function Status({ children, tone = 'info', className }) {
     if (!children) return null;
