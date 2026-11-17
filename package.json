@@ -1,6 +1,6 @@
 {
   "name": "dsh-code-security",
-  "version": "0.7.12",
+  "version": "0.7.13",
   "description": "DSH 代码安全工作台：本地静态检查、Git 改动审查、证据与修复复核，可选增强扫描器。欢迎提交 issues 和 PR。",
   "type": "module",
   "main": "lib/index.js",
@@ -82,7 +82,7 @@
     "@babel/types": "7.29.8",
     "proper-lockfile": "4.1.2",
     "smol-toml": "1.9.1",
-    "@stardustlc/dsh-updates": "0.1.4"
+    "@stardustlc/dsh-updates": "0.2.0"
   },
   "icon": "./assets/plugin-icon.webp"
 }

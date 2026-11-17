@@ -18,8 +18,8 @@ importers:
         specifier: 7.29.8
         version: 7.29.8
       '@stardustlc/dsh-updates':
-        specifier: 0.1.4
-        version: 0.1.4
+        specifier: 0.2.0
+        version: 0.2.0
       proper-lockfile:
         specifier: 4.1.2
         version: 4.1.2
@@ -95,8 +95,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@stardustlc/dsh-updates@0.1.4':
-    resolution: {integrity: sha512-PL43wpQV0699ZOPmoQ7G3G+GAbf9J7+VAuw2EyxGthUeTfNeuDS+t8pEkN1KoAYb0oc1UJ8JL/aCf4NXcr0Hlw==}
+  '@stardustlc/dsh-updates@0.2.0':
+    resolution: {integrity: sha512-S5jX/6wvRlpcGXivrriX1jIGDDFMETm+7bFXMJdA7Wn3SclXxEMStI+LmUDGbIGeI6te9OdehvHzwhKKIAUsqw==}
     engines: {node: ^22.19.0 || >=24.0.0}
 
   '@types/babel__traverse@7.28.0':
@@ -235,7 +235,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
 
-  '@stardustlc/dsh-updates@0.1.4':
+  '@stardustlc/dsh-updates@0.2.0':
     dependencies:
       acorn: 8.15.0
       proper-lockfile: 4.1.2
