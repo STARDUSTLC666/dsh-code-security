@@ -166,5 +166,9 @@ export class SecurityWorkbench {
 }
 
 export function installSecurityWorkbench(ctx: any, workbench: SecurityWorkbench): void {
-  ctx.inject?.(['connection'], (host: any) => host.connection.fetch.register({ path: SECURITY_WORKBENCH_ROUTE, methods: ['POST'], requestBody: 'buffered', fetch: (request: Request) => workbench.fetch(request) }))
+  ctx.inject?.(['connection'], (host: any) => {
+    const mount = () => host.connection.fetch.register({ path: SECURITY_WORKBENCH_ROUTE, methods: ['POST'], requestBody: 'buffered', fetch: (request: Request) => workbench.fetch(request) })
+    if (typeof host.effect === 'function') host.effect(() => { const off = mount(); return typeof off === 'function' ? off : undefined })
+    else mount()
+  })
 }

@@ -20,6 +20,7 @@ export interface SecurePluginContext {
     tools: {
         register(definition: SecureToolDefinition): () => void;
     };
+    effect?(fn: () => (() => unknown) | void): unknown;
     on?(event: string, listener: (...args: any[]) => unknown, options?: {
         prepend?: boolean;
     }): (() => void) | void;

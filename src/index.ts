@@ -22,8 +22,23 @@ export const inject = ['tools', 'subprocess']
 export interface SecurePluginContext {
   subprocess: { spawn: SubprocessSpawnLike }
   tools: { register(definition: SecureToolDefinition): () => void }
+  effect?(fn: () => (() => unknown) | void): unknown
   on?(event: string, listener: (...args: any[]) => unknown, options?: { prepend?: boolean }): (() => void) | void
   inject?(services: string[], callback: (ctx: any) => void): unknown
+}
+
+function registerUnload(
+  ctx: { effect?: (fn: () => () => unknown) => unknown; on?: (event: string, listener: () => unknown) => unknown },
+  cleanup: () => unknown,
+): void {
+  let done = false
+  const run = () => {
+    if (done) return
+    done = true
+    return cleanup()
+  }
+  if (typeof ctx.effect === 'function') ctx.effect(() => run)
+  ctx.on?.('dispose', run)
 }
 
 export function apply(ctx: SecurePluginContext, config?: SecureConfig | null): void {
@@ -55,7 +70,7 @@ export function apply(ctx: SecurePluginContext, config?: SecureConfig | null): v
       if (typeof host.effect === 'function') host.effect(() => detach)
       else host.on?.('dispose', detach)
     })
-    ctx.on?.('dispose', async () => { automatic.dispose(); await automatic.whenIdle(); await workbench.dispose() })
+    registerUnload(ctx, async () => { automatic.dispose(); await automatic.whenIdle(); await workbench.dispose() })
   }
   for (const definition of tools) {
     disposers.push(ctx.tools.register({ ...definition, async execute(args, exec) {
@@ -69,7 +84,7 @@ export function apply(ctx: SecurePluginContext, config?: SecureConfig | null): v
     } }))
   }
   if (typeof ctx.on === 'function') {
-    ctx.on('tools/pre-execute', async (exec: { name?: unknown; arguments?: unknown }, next: () => Promise<unknown>) => {
+    const offPre = ctx.on('tools/pre-execute', async (exec: { name?: unknown; arguments?: unknown }, next: () => Promise<unknown>) => {
       const args = (typeof exec.arguments === 'object' && exec.arguments !== null ? exec.arguments : {}) as Record<string, unknown>
       let reason: string | undefined
       if (exec.name === 'secure_policy_set') reason = '覆盖写入项目 .code-security.json 安全策略'
@@ -78,8 +93,9 @@ export function apply(ctx: SecurePluginContext, config?: SecureConfig | null): v
       if (reason === undefined) return next()
       return { kind: 'ask', reason }
     }, { prepend: true })
-    ctx.on('dispose', () => { for (const dispose of disposers) dispose() })
+    if (typeof offPre === 'function') disposers.push(offPre)
   }
+  registerUnload(ctx, () => { for (const dispose of disposers.splice(0)) dispose() })
 }
 
 export * from './config.js'
