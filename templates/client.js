@@ -70,7 +70,14 @@ let securityHostContext;
                     h('p', { className: 'secw-file' }, finding.file + ':' + finding.line),
                     h('div', { className: 'dsh-wb-toolbar' },
                         h(W.Button, { icon: copied ? 'check' : 'copy', copied, onClick: () => onCopy(finding) }, copied ? t('已复制', 'Copied') : t('复制位置', 'Copy location')),
-                        h(W.Button, { icon: 'external', onClick: () => onOpen(finding) }, t('打开文件', 'Open file')))));
+                        h(W.Button, { icon: 'external', onClick: () => onOpen(finding) }, t('打开文件', 'Open file')),
+                        h(SecurityPromptChip, {
+                            prompt: t(
+                                '请核对并修复 ' + finding.file + ':' + finding.line + ' 的安全问题（' + finding.ruleId + ' / ' + finding.cwe + '），修完后对同一范围复查确认关闭',
+                                'Review and fix the security finding at ' + finding.file + ':' + finding.line + ' (' + finding.ruleId + ' / ' + finding.cwe + '), then recheck the same scope',
+                            ),
+                            label: t('复制修复指令', 'Copy fix prompt'),
+                        }))));
         }
         function Workbench({ workbench = false } = {}) {
             const [activeTab, setActiveTab] = useState('findings'), [switchTo, setSwitchTo] = useState(''), [copiedId, setCopiedId] = useState('');
@@ -282,22 +289,43 @@ let securityHostContext;
                 result?.coverage && 'closedCount' in result && result.complete === false ? h('div', { className: 'secw-banner-wrap' }, h(Coverage, { rows: Array.isArray(result.coverage) ? result.coverage : [result.coverage] })) : null,
                 result?.configurationError ? h(W.Status, { tone: 'error' }, message(result.configurationError)) : null,
                 result && 'closedCount' in result ? h(W.Status, { tone: result.complete === false ? 'warn' : 'success' }, result.complete === false ? t('复查未完成，未判定任何问题已修复。', 'Recheck incomplete. No finding was marked fixed.') : t('本次复查：关闭 ', 'This recheck: closed ') + result.closedCount + ' · ' + t('仍存在 ', 'remaining ') + result.remainingCount + ' · ' + t('新增 ', 'new ') + result.freshCount) : null,
-                !catalog.length ? h(W.Empty, {
-                    title: loading ? t('正在载入…', 'Loading…') : t('还没有检查过的项目', 'No checked projects yet'),
-                    icon: 'shield',
-                    action: !loading ? h(W.Button, { icon: 'refresh', onClick: () => {
-                        setLoading(true);
-                        request({ operation: 'list' }).then(v => {
-                            if (!mounted.current) return;
-                            setCatalog(v.workspaces);
-                            if (v.workspaces[0]) void open(v.workspaces[0].id);
-                            else setLoading(false);
-                        }).catch(e => {
-                            if (mounted.current) { setError(message(e.message)); setLoading(false); }
-                        });
-                    } }, t('刷新项目', 'Refresh projects')) : null,
-                }, t('在项目聊天中说：“检查这个项目的安全问题。”项目随后会出现在这里。', 'In a project chat, ask: “Check this project for security issues.” It will then appear here.')) :
-                h(W.Tabs, {
+                !catalog.length ? h('div', { className: 'secw-empty-wrap' },
+                    h(W.Empty, {
+                        title: loading ? t('正在载入…', 'Loading…') : t('还没有检查过的项目', 'No checked projects yet'),
+                        icon: 'shield',
+                        action: !loading ? h('div', { className: 'secw-empty-stack' },
+                            h('div', { className: 'dsh-wb-prompt-chips' },
+                                h(SecurityPromptChip, {
+                                    variant: 'primary',
+                                    prompt: t(
+                                        '检查这个项目的安全问题，给出触发条件、文件位置和脱敏证据',
+                                        'Check this project for security issues with triggers, file locations, and redacted evidence',
+                                    ),
+                                    label: t('复制：检查这个项目', 'Copy: Check this project'),
+                                }),
+                                h(SecurityPromptChip, {
+                                    prompt: t(
+                                        '审查当前 Git 改动的安全问题，只报告有触发条件和代码证据的结果',
+                                        'Review current Git changes for security issues with concrete triggers and code evidence',
+                                    ),
+                                    label: t('复制：审查 Git 改动', 'Copy: Check Git diff'),
+                                }),
+                                h(W.Button, { icon: 'refresh', onClick: () => {
+                                    setLoading(true);
+                                    request({ operation: 'list' }).then(v => {
+                                        if (!mounted.current) return;
+                                        setCatalog(v.workspaces);
+                                        if (v.workspaces[0]) void open(v.workspaces[0].id);
+                                        else setLoading(false);
+                                    }).catch(e => {
+                                        if (mounted.current) { setError(message(e.message)); setLoading(false); }
+                                    });
+                                } }, t('刷新项目', 'Refresh projects')))) : null,
+                    }, t('一键复制下方指令发到目标仓库对话即可启动首次检查，项目随后会自动出现在这里。', 'Copy a prompt below in one click and send it in a project chat — the project will appear here automatically.')),
+                    !loading ? h('div', { className: 'secw-guide-wrap' }, h(SecurityWorkflowGuide, { defaultOpen: true })) : null) :
+                h(React.Fragment, null,
+                    h('div', { className: 'secw-guide-wrap' }, h(SecurityWorkflowGuide, { defaultOpen: false })),
+                    h(W.Tabs, {
                     label: t('代码安全视图', 'Code security views'),
                     value: activeTab,
                     onChange: setActiveTab,
@@ -401,7 +429,7 @@ let securityHostContext;
                                     h('p', null, v.summary),
                                     h('p', { className: 'secw-muted' }, t('修复版本：', 'Fixed versions: ') + (v.fixedVersions?.join(', ') || t('暂无', 'Not available'))),
                                     h(ExternalLink, { href: v.url }, v.id)))) : null) : null)
-                    : h(SecurityResults, { report, findings, fresh, filter, setFilter, limit, setLimit, busy, loading, download, copiedId, onOpen: f => location(f, false), onCopy: f => location(f, true) })),
+                    : h(SecurityResults, { report, findings, fresh, filter, setFilter, limit, setLimit, busy, loading, disabled, onRun: run, download, copiedId, onOpen: f => location(f, false), onCopy: f => location(f, true) }))),
                 !catalog.length ? updateControls : null,
                 switchTo ? h(W.Dialog, {
                     title: t('设置尚未保存', 'Unsaved settings'),

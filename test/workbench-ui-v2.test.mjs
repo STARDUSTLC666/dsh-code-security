@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
 
-function createMockEnv({ withHostPrimitives = false, storageThrows = false, initialStyle = null } = {}) {
+function createMockEnv({ withHostPrimitives = false, storageThrows = false, initialStyle = null, onClipboardWrite = null } = {}) {
   const storage = new Map()
   if (initialStyle) storage.set('dsh-stardust:ui-style', initialStyle)
   const windowListeners = new Map()
@@ -104,6 +104,8 @@ function createMockEnv({ withHostPrimitives = false, storageThrows = false, init
 
   let stateValues = []
   let stateCursor = 0
+  let refValues = []
+  let refCursor = 0
   const effects = []
   const cleanups = []
   const React = {
@@ -137,7 +139,9 @@ function createMockEnv({ withHostPrimitives = false, storageThrows = false, init
       effects.push(fn)
     },
     useRef(initial) {
-      return { current: initial }
+      const idx = refCursor++
+      if (!(idx in refValues)) refValues[idx] = { current: initial }
+      return refValues[idx]
     },
     useId() {
       return 'sec-uid'
@@ -166,13 +170,17 @@ function createMockEnv({ withHostPrimitives = false, storageThrows = false, init
   const rawBundle = readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8')
   const instrumented = rawBundle.replace(
     "return { inject: ['slots', 'locale'], apply };",
-    "return { inject: ['slots', 'locale'], apply, probe: { W, Workbench, SecurityResults, FindingCard, HealthReport, Coverage } };",
+    "return { inject: ['slots', 'locale'], apply, probe: { W, Workbench, SecurityResults, SecurityWorkflowGuide, FindingCard, HealthReport, Coverage } };",
   )
 
   runInNewContext(instrumented, {
     window: mockWindow,
     document: mockDocument,
     CustomEvent: MockCustomEvent,
+    AbortController,
+    setTimeout,
+    clearTimeout,
+    navigator: { clipboard: { async writeText(val) { onClipboardWrite?.(val) } } },
     fetch: async () => ({ ok: true, json: async () => ({ ok: true, workspaces: [] }) }),
   })
 
@@ -194,10 +202,15 @@ function createMockEnv({ withHostPrimitives = false, storageThrows = false, init
     slots: { inject(_n, fn) { fn() }, register() { return () => {} } },
   })
 
-  function renderTree(renderFn) {
+  function rerenderTree(renderFn) {
     stateCursor = 0
+    refCursor = 0
     effects.length = 0
-    const vnode = renderFn()
+    return expand(renderFn())
+  }
+
+  function renderTree(renderFn) {
+    const vnode = rerenderTree(renderFn)
     while (effects.length) {
       const fn = effects.shift()
       const off = fn()
@@ -248,10 +261,11 @@ function createMockEnv({ withHostPrimitives = false, storageThrows = false, init
     dispatchedEvents,
     makeDomElement,
     renderTree,
+    rerenderTree,
     expand,
     findAll,
     getPrimitivesRequireCount: () => primitivesRequireCount,
-    resetState() { stateValues = []; stateCursor = 0 },
+    resetState() { stateValues = []; stateCursor = 0; refValues = []; refCursor = 0 },
     cleanup() { while (cleanups.length) cleanups.pop()() },
   }
 }
@@ -444,4 +458,71 @@ test('HostMenuWithStyle & Cordis 4 ctx.effect unload cleanup work cleanly', asyn
   assert.equal(registered.size, 10)
   for (const off of effectCleanups) await off()
   assert.equal(registered.size, 0, 'ctx.effect disposer unregisters all tools on Cordis 4 unload')
+})
+
+test('Unscanned project empty state & 4-step workflow guide expose inline CTAs, 1-click copy prompts, and accessible <details>/<summary>', async () => {
+  const copied = []
+  const env = createMockEnv({ withHostPrimitives: false, onClipboardWrite: val => copied.push(val) })
+  const { W, Workbench, SecurityResults, SecurityWorkflowGuide } = env.client.probe
+
+  // Verify accessible disclosure marker & reduced-motion CSS rules
+  assert.match(W.styles, /content:\s*"▸";[\s\S]*?content:\s*"▸"\s*\/\s*""/)
+  assert.match(W.styles, /@media\s*\(prefers-reduced-motion:\s*no-preference\)[\s\S]*?transition:\s*rotate/)
+
+  // 1) Unscanned project empty state (!report.hasScan) provides inline Scan code & Check changes CTAs
+  const triggeredActions = []
+  const emptyScanTree = env.expand(env.renderTree(() =>
+    env.React.createElement(SecurityResults, {
+      report: { hasScan: false },
+      findings: [],
+      fresh: new Set(),
+      limit: 50,
+      busy: false,
+      loading: false,
+      onRun: name => triggeredActions.push(name),
+    }),
+  ))
+  const scanBtn = env.findAll(emptyScanTree, n => n.type === 'button' && n.props?.['data-sec-empty-action'] === 'scan')[0]
+  const diffBtn = env.findAll(emptyScanTree, n => n.type === 'button' && n.props?.['data-sec-empty-action'] === 'diff')[0]
+  assert.ok(scanBtn, 'expected inline 检查代码 primary CTA inside !report.hasScan empty state')
+  assert.ok(diffBtn, 'expected inline 检查改动 secondary CTA inside !report.hasScan empty state')
+  scanBtn.props.onClick()
+  diffBtn.props.onClick()
+  assert.deepEqual(triggeredActions, ['scan', 'diff'])
+
+  // 2) Collapsible 4-step security workflow guide + 1-click copyable prompt chips
+  env.resetState()
+  const renderGuide = () => env.expand(env.renderTree(() => env.React.createElement(SecurityWorkflowGuide, { defaultOpen: true })))
+  let guideTree = renderGuide()
+  assert.equal(guideTree.type, 'details')
+  const summaryNode = env.findAll(guideTree, n => n.type === 'summary')[0]
+  assert.ok(summaryNode)
+  const summaryHeadings = env.findAll(summaryNode, n => typeof n.type === 'string' && /^h[1-6]$/.test(n.type))
+  assert.equal(summaryHeadings.length, 0, 'never place h1-h6 inside <summary>')
+
+  const promptBtn = env.findAll(guideTree, n => n.type === 'button' && n.props?.['data-copy-prompt'])[0]
+  assert.ok(promptBtn, 'expected 1-click copyable chat prompt chip')
+  const expectedPrompt = promptBtn.props['data-copy-prompt']
+  promptBtn.props.onClick()
+  await new Promise(r => setTimeout(r, 10))
+  guideTree = renderGuide()
+
+  assert.deepEqual(copied, [expectedPrompt])
+  const copiedBtn = env.findAll(guideTree, n => n.type === 'button' && n.props?.['data-copy-prompt'] === expectedPrompt && n.props?.['data-copied'] === 'true')[0]
+  assert.ok(copiedBtn, 'copy chip stamps data-copied="true" after copying')
+  assert.ok(!copiedBtn.props.disabled, 'copy chip stays enabled during feedback')
+  const liveStatus = env.findAll(guideTree, n => n.props?.role === 'status' && n.props?.['data-visible'] === 'true')[0]
+  assert.ok(liveStatus, 'external role="status" live region announces copy confirmation')
+
+  // 3) Empty catalog Workbench view also renders 1-click copyable prompts once loading finishes
+  env.resetState()
+  env.renderTree(() => env.React.createElement(Workbench, { workbench: true }))
+  await new Promise(r => setTimeout(r, 10))
+  const emptyCatalogTree = env.rerenderTree(() => env.React.createElement(Workbench, { workbench: true }))
+  const catalogCopyChips = env.findAll(emptyCatalogTree, n => n.type === 'button' && n.props?.['data-copy-prompt'])
+  assert.ok(catalogCopyChips.length >= 2, 'empty catalog view exposes 1-click copyable chat prompts')
+  const catalogGuides = env.findAll(emptyCatalogTree, n => n.type === 'details' && Object.hasOwn(n.props || {}, 'data-sec-workflow-guide'))
+  assert.equal(catalogGuides.length, 1, 'empty catalog view renders the 4-step security workflow guide')
+
+  env.cleanup()
 })

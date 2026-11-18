@@ -1,5 +1,10 @@
 # 更新记录
 
+## 0.8.3 (2026-11-18)
+
+- 未扫描项目空状态内置「检查代码 / 检查改动」主操作按钮，漏洞卡片新增一键「复制修复指令」，并补齐可折叠四步安全巡检闭环指引与场景指令。
+- Add inline **Scan code** and **Check changes** primary CTAs inside unscanned project states, contextual **Copy fix prompt** actions on finding cards, and a collapsible 4-step security workflow guide.
+
 ## 0.8.2 (2026-11-18)
 
 - 更新区底部新增克制、无打扰的 GitHub 点赞与问题反馈快捷链接，并完善中英文检索关键词。
