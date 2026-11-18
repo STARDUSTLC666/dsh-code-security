@@ -170,7 +170,7 @@ function createMockEnv({ withHostPrimitives = false, storageThrows = false, init
   const rawBundle = readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8')
   const instrumented = rawBundle.replace(
     "return { inject: ['slots', 'locale'], apply };",
-    "return { inject: ['slots', 'locale'], apply, probe: { W, Workbench, SecurityResults, SecurityWorkflowGuide, FindingCard, HealthReport, Coverage } };",
+    "return { inject: ['slots', 'locale'], apply, probe: { W, Workbench, SecurityResults, FindingCard, HealthReport, Coverage } };",
   )
 
   runInNewContext(instrumented, {
@@ -460,18 +460,20 @@ test('HostMenuWithStyle & Cordis 4 ctx.effect unload cleanup work cleanly', asyn
   assert.equal(registered.size, 0, 'ctx.effect disposer unregisters all tools on Cordis 4 unload')
 })
 
-test('Unscanned project empty state & 4-step workflow guide expose inline CTAs, 1-click copy prompts, and accessible <details>/<summary>', async () => {
+test('Unscanned project inline CTAs & interactive CoachmarkTour (? 引导, directional arrow, step progression, localStorage done)', async () => {
   const copied = []
   const env = createMockEnv({ withHostPrimitives: false, onClipboardWrite: val => copied.push(val) })
-  const { W, Workbench, SecurityResults, SecurityWorkflowGuide } = env.client.probe
+  const { W, Workbench, SecurityResults } = env.client.probe
 
-  // Verify accessible disclosure marker & reduced-motion CSS rules
-  assert.match(W.styles, /content:\s*"▸";[\s\S]*?content:\s*"▸"\s*\/\s*""/)
-  assert.match(W.styles, /@media\s*\(prefers-reduced-motion:\s*no-preference\)[\s\S]*?transition:\s*rotate/)
+  // Verify popover + spotlight + directional arrow + 8-bit & reduced-motion CSS rules
+  assert.match(W.styles, /\[popover\]:is\(:popover-open,\s*\.\\:popover-open\)\s*\{\s*display:\s*block;\s*\}/)
+  assert.match(W.styles, /\.dsh-wb-tour-card\[data-side="bottom"\]\s*>\s*\.dsh-wb-tour-arrow/)
+  assert.match(W.styles, /box-shadow:\s*4px 4px 0px #1e2826/)
+  assert.match(W.styles, /@media\s*\(prefers-reduced-motion:\s*no-preference\)[\s\S]*?\.dsh-wb-tour-spotlight/)
 
-  // 1) Unscanned project empty state (!report.hasScan) provides inline Scan code & Check changes CTAs
+  // 1) Unscanned project empty state (!report.hasScan) provides inline Scan code & Check changes CTAs + 1-click prompt chips
   const triggeredActions = []
-  const emptyScanTree = env.expand(env.renderTree(() =>
+  const emptyScanTree = env.renderTree(() =>
     env.React.createElement(SecurityResults, {
       report: { hasScan: false },
       findings: [],
@@ -481,7 +483,7 @@ test('Unscanned project empty state & 4-step workflow guide expose inline CTAs, 
       loading: false,
       onRun: name => triggeredActions.push(name),
     }),
-  ))
+  )
   const scanBtn = env.findAll(emptyScanTree, n => n.type === 'button' && n.props?.['data-sec-empty-action'] === 'scan')[0]
   const diffBtn = env.findAll(emptyScanTree, n => n.type === 'button' && n.props?.['data-sec-empty-action'] === 'diff')[0]
   assert.ok(scanBtn, 'expected inline 检查代码 primary CTA inside !report.hasScan empty state')
@@ -490,39 +492,97 @@ test('Unscanned project empty state & 4-step workflow guide expose inline CTAs, 
   diffBtn.props.onClick()
   assert.deepEqual(triggeredActions, ['scan', 'diff'])
 
-  // 2) Collapsible 4-step security workflow guide + 1-click copyable prompt chips
+  // 2) Workbench has zero static <details> workflow guide clutter, keeps SecurityPromptChip in W.Empty, exposes ? 引导, and runs 4-step CoachmarkTour
   env.resetState()
-  const renderGuide = () => env.expand(env.renderTree(() => env.React.createElement(SecurityWorkflowGuide, { defaultOpen: true })))
-  let guideTree = renderGuide()
-  assert.equal(guideTree.type, 'details')
-  const summaryNode = env.findAll(guideTree, n => n.type === 'summary')[0]
-  assert.ok(summaryNode)
-  const summaryHeadings = env.findAll(summaryNode, n => typeof n.type === 'string' && /^h[1-6]$/.test(n.type))
-  assert.equal(summaryHeadings.length, 0, 'never place h1-h6 inside <summary>')
+  let wbTree = env.renderTree(() => env.React.createElement(Workbench, { workbench: true }))
+  assert.equal(env.findAll(wbTree, n => n.type === 'details' && Object.hasOwn(n.props || {}, 'data-sec-workflow-guide')).length, 0, 'static workflow box removed')
 
-  const promptBtn = env.findAll(guideTree, n => n.type === 'button' && n.props?.['data-copy-prompt'])[0]
-  assert.ok(promptBtn, 'expected 1-click copyable chat prompt chip')
-  const expectedPrompt = promptBtn.props['data-copy-prompt']
-  promptBtn.props.onClick()
+  const triggerBtn = env.findAll(wbTree, n => n.type === 'button' && Object.hasOwn(n.props || {}, 'data-tour-trigger'))[0]
+  assert.ok(triggerBtn, 'expected topbar ? 引导 trigger button')
+  assert.equal(triggerBtn.props['aria-expanded'], false)
+  assert.equal(triggerBtn.props['aria-haspopup'], undefined, 'must NOT set aria-haspopup on tour trigger')
+
+  // Wait for list fetch + 280ms first-visit auto-open timer
+  await new Promise(r => setTimeout(r, 310))
+  wbTree = env.rerenderTree(() => env.React.createElement(Workbench, { workbench: true }))
+
+  // Empty catalog W.Empty still exposes SecurityPromptChip buttons
+  const emptyPromptChips = env.findAll(wbTree, n => n.type === 'button' && n.props?.['data-copy-prompt'])
+  assert.ok(emptyPromptChips.length >= 2, 'SecurityPromptChip buttons inside empty catalog W.Empty remain intact')
+
+  let tourDialog = env.findAll(wbTree, n => n.props?.role === 'dialog' && n.props?.['aria-modal'] === 'false')[0]
+  assert.ok(tourDialog, 'CoachmarkTour auto-opens after 280ms on first visit')
+  assert.equal(tourDialog.props['data-tour-card'], 'scan')
+  const arrow = env.findAll(tourDialog, n => Object.hasOwn(n.props || {}, 'data-tour-arrow'))[0]
+  assert.ok(arrow, 'CoachmarkTour renders directional [data-tour-arrow]')
+
+  // Step 1 includes inline 1-click prompt copy button when no project is scanned yet
+  const step1PromptBtn = env.findAll(tourDialog, n => n.type === 'button' && n.props?.['data-copy-prompt'] === '检查这个项目的安全问题，给出触发条件、文件位置和脱敏证据')[0]
+  assert.ok(step1PromptBtn, 'Step 1 exposes inline 1-click prompt copy button when unscanned')
+  step1PromptBtn.props.onClick()
   await new Promise(r => setTimeout(r, 10))
-  guideTree = renderGuide()
+  assert.deepEqual(copied, ['检查这个项目的安全问题，给出触发条件、文件位置和脱敏证据'])
 
-  assert.deepEqual(copied, [expectedPrompt])
-  const copiedBtn = env.findAll(guideTree, n => n.type === 'button' && n.props?.['data-copy-prompt'] === expectedPrompt && n.props?.['data-copied'] === 'true')[0]
-  assert.ok(copiedBtn, 'copy chip stamps data-copied="true" after copying')
-  assert.ok(!copiedBtn.props.disabled, 'copy chip stays enabled during feedback')
-  const liveStatus = env.findAll(guideTree, n => n.props?.role === 'status' && n.props?.['data-visible'] === 'true')[0]
-  assert.ok(liveStatus, 'external role="status" live region announces copy confirmation')
+  // Progress through Steps 2 -> 3 -> 4 and complete tour
+  for (const expectedStepId of ['findings', 'dependencies', 'verify']) {
+    const nextBtn = env.findAll(tourDialog, n => Object.hasOwn(n.props || {}, 'data-tour-next'))[0]
+    nextBtn.props.onClick()
+    wbTree = env.rerenderTree(() => env.React.createElement(Workbench, { workbench: true }))
+    tourDialog = env.findAll(wbTree, n => n.props?.role === 'dialog' && n.props?.['aria-modal'] === 'false')[0]
+    assert.equal(tourDialog.props['data-tour-card'], expectedStepId)
+  }
 
-  // 3) Empty catalog Workbench view also renders 1-click copyable prompts once loading finishes
+  const doneBtn = env.findAll(tourDialog, n => Object.hasOwn(n.props || {}, 'data-tour-next'))[0]
+  doneBtn.props.onClick()
+  assert.equal(env.storage.get('dsh-code-security.tour.v1'), 'done')
+  wbTree = env.rerenderTree(() => env.React.createElement(Workbench, { workbench: true }))
+  assert.equal(env.findAll(wbTree, n => n.props?.role === 'dialog' && n.props?.['aria-modal'] === 'false').length, 0)
+
+  // Verify modalOpen suppresses / closes active CoachmarkTour and popover="manual" uses setAttribute (not IDL .popover)
+  let popoverAttr = null
+  let popoverShown = false
   env.resetState()
-  env.renderTree(() => env.React.createElement(Workbench, { workbench: true }))
-  await new Promise(r => setTimeout(r, 10))
-  const emptyCatalogTree = env.rerenderTree(() => env.React.createElement(Workbench, { workbench: true }))
-  const catalogCopyChips = env.findAll(emptyCatalogTree, n => n.type === 'button' && n.props?.['data-copy-prompt'])
-  assert.ok(catalogCopyChips.length >= 2, 'empty catalog view exposes 1-click copyable chat prompts')
-  const catalogGuides = env.findAll(emptyCatalogTree, n => n.type === 'details' && Object.hasOwn(n.props || {}, 'data-sec-workflow-guide'))
-  assert.equal(catalogGuides.length, 1, 'empty catalog view renders the 4-step security workflow guide')
+  const PopoverHarness = () => {
+    const tree = W.CoachmarkTour({
+      steps: [{ id: 's1', selector: '#scan', side: 'bottom', title: 'T', desc: 'D' }],
+      step: 0,
+      manual: true,
+      style: 'pixel8bit',
+      lang: 'zh',
+    })
+    tree.props.ref.current = {
+      setAttribute(k, v) { if (k === 'popover') popoverAttr = v },
+      showPopover() { popoverShown = true },
+      hidePopover() {},
+    }
+    return tree
+  }
+  env.renderTree(() => env.React.createElement(PopoverHarness))
+  assert.equal(popoverAttr, 'manual')
+  assert.equal(popoverShown, true)
+
+  env.resetState()
+  const suppressedPage = env.renderTree(() =>
+    env.React.createElement(W.Page, {
+      workbench: true,
+      title: '代码安全',
+      modalOpen: true,
+      tourStorageKey: 'dsh-code-security.modal-test.v1',
+      tourSteps: [{ id: 's1', selector: '#x', title: 'T', desc: 'D' }],
+    }, 'body'),
+  )
+  await new Promise(r => setTimeout(r, 310))
+  const afterTimer = env.rerenderTree(() =>
+    env.React.createElement(W.Page, {
+      workbench: true,
+      title: '代码安全',
+      modalOpen: true,
+      tourStorageKey: 'dsh-code-security.modal-test.v1',
+      tourSteps: [{ id: 's1', selector: '#x', title: 'T', desc: 'D' }],
+    }, 'body'),
+  )
+  assert.equal(env.findAll(suppressedPage, n => n.props?.className === 'dsh-wb-tour-layer').length, 0)
+  assert.equal(env.findAll(afterTimer, n => n.props?.className === 'dsh-wb-tour-layer').length, 0, 'modalOpen suppresses auto-tour')
 
   env.cleanup()
 })

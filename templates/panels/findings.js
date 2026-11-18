@@ -45,83 +45,6 @@ function SecurityPromptChip({ prompt, label, variant = 'outline', className }) {
   });
 }
 
-function SecurityWorkflowGuide({ defaultOpen = false }) {
-  return h(
-    W.GuideDetails,
-    {
-      open: defaultOpen,
-      className: 'secw-workflow-guide',
-      'data-sec-workflow-guide': '',
-      summary: t(
-        '安全巡检 4 步流：扫改动 → 看证据链 → 让助手修漏洞 → 复测归档',
-        '4-Step Security Loop: Check diff → Inspect evidence → Fix in chat → Recheck & archive',
-      ),
-    },
-    h(
-      'ol',
-      { className: 'dsh-wb-guide-steps' },
-      h(
-        'li',
-        null,
-        t(
-          '扫改动：日常提交前点「检查改动」快速巡检 Git 新增代码；首次接手或发版前点「检查代码」建立全仓基线。',
-          'Check diff: Run “Check changes” before commits for fast Git diff checks, or “Scan code” to establish a full baseline.',
-        ),
-      ),
-      h(
-        'li',
-        null,
-        t(
-          '看证据链：在「检查结果」核对文件行号、数据流/模式依据与脱敏片段，排除测试夹具或预期公开常量。',
-          'Inspect evidence: Review file lines, data-flow or pattern context, and redacted snippets to separate real risks from test fixtures.',
-        ),
-      ),
-      h(
-        'li',
-        null,
-        t(
-          '让助手修漏洞：一键复制下方或问题详情里的修复指令发到项目聊天，让助手结合上下文完成安全修复。',
-          'Fix in chat: Copy a fix prompt in one click and paste it into your project chat so the assistant patches the root cause.',
-        ),
-      ),
-      h(
-        'li',
-        null,
-        t(
-          '复测归档：修完后点「复查修复」对同一范围重验关闭情况，按需下载 Markdown 或 SARIF 报告归档。',
-          'Recheck & archive: Click “Recheck fixes” on the same scope to confirm closure, then export Markdown or SARIF reports if needed.',
-        ),
-      ),
-    ),
-    h(
-      'div',
-      { className: 'dsh-wb-guide-actions' },
-      h(SecurityPromptChip, {
-        variant: 'primary',
-        prompt: t(
-          '审查当前 Git 改动的安全问题，给出触发条件、文件位置和脱敏证据',
-          'Review current Git changes for security issues with triggers, file locations, and redacted evidence',
-        ),
-        label: t('复制：审查 Git 改动', 'Copy: Check Git diff'),
-      }),
-      h(SecurityPromptChip, {
-        prompt: t(
-          '检查这个项目的安全问题并按高风险优先汇总',
-          'Check this project for security issues and prioritize high-risk findings',
-        ),
-        label: t('复制：检查整个项目', 'Copy: Scan project'),
-      }),
-      h(SecurityPromptChip, {
-        prompt: t(
-          '根据当前安全检查结果逐项修复高风险问题，修完后对同一范围复查确认关闭',
-          'Fix high-risk findings from the latest security check, then recheck the same scope to confirm closure',
-        ),
-        label: t('复制：让助手修漏洞并复测', 'Copy: Fix & recheck'),
-      }),
-    ),
-  );
-}
-
 function SecurityResults({
   report,
   findings,
@@ -658,23 +581,6 @@ const SECURITY_WORKBENCH_CSS = `
 
 .security-workbench .secw-banner-wrap {
   padding: 0 18px;
-}
-
-.security-workbench .secw-guide-wrap {
-  padding: 10px 18px 2px;
-  width: min(100%, 960px);
-}
-
-.security-workbench .secw-empty-wrap {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 0;
-}
-
-.security-workbench .secw-empty-wrap .secw-guide-wrap {
-  margin-inline: auto;
-  padding-block-end: 20px;
 }
 
 .security-workbench .secw-empty-stack {

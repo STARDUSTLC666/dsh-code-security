@@ -49,7 +49,7 @@ Follow the **4-Step Security Loop (Check diff → Inspect evidence → Fix in ch
 
 1. **Check diff or scan code**: Trigger your first check from a project chat (using the 1-click copy prompts in the empty state), or click **Scan code** / **Check changes** directly inside the **Code security** workbench (built-in rules work out of the box).
 2. **Inspect the evidence chain**: Review file lines, data-flow or pattern explanations, and redacted snippets in **Findings** to separate real vulnerabilities from test fixtures or intentional constants.
-3. **Ask the assistant to fix**: Click **Copy fix prompt** on any finding (or from the collapsible workflow guide) and paste into your project chat so the assistant patches the root cause in context.
+3. **Ask the assistant to fix**: Click **Copy fix prompt** on any finding (or open **? Tour** in the header) and paste into your project chat so the assistant patches the root cause in context.
 4. **Recheck & archive**: Click **Recheck fixes** on the same scope to verify closure and ensure no new findings were introduced, then export Markdown or SARIF reports as needed.
 
 Handy chat prompts (1-click copyable in the workbench):

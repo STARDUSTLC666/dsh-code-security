@@ -243,7 +243,7 @@ let securityHostContext;
             const updateControls = typeof __stardustUpdatesFooter === 'function'
               ? __stardustUpdatesFooter(React, 'dsh-code-security') : null;
 
-            const projectToolbar = catalog.length ? h('div', { className: 'security-project' },
+            const projectToolbar = catalog.length ? h('div', { className: 'security-project', 'data-tour': 'sec-project' },
                 h('span', { className: 'security-project-label', id: controlId + '-project-label' }, t('项目', 'Project')),
                 h(W.ChoiceMenu, {
                     id: controlId + '-project',
@@ -259,10 +259,66 @@ let securityHostContext;
                     },
                 })) : null;
 
+            const secTabsId = controlId + '-tabs';
             const auditModes = [
                 { id: 'none', label: t('仅列出依赖（离线）', 'Dependency inventory (offline)') },
                 { id: 'offline', label: t('已知漏洞（本地数据库）', 'Known vulnerabilities (local database)') },
                 { id: 'online', label: t('已知漏洞（联网）', 'Known vulnerabilities (online)') },
+            ];
+            const securityTourSteps = [
+                {
+                    id: 'scan',
+                    selector: '[data-tour="sec-scan"]',
+                    fallback: '[data-tour="sec-project"], [data-sec-empty-action="scan"], [data-copy-prompt]',
+                    side: 'bottom',
+                    title: t('选择项目与一键安全扫描', 'Select project & run a security check'),
+                    desc: t(
+                        '切换已收录的工作区后，点「检查代码」扫描全仓或点「检查改动」快速审查 Git 新增代码；首次使用可直接复制下方指令发到项目聊天。',
+                        'Pick a workspace and click Scan code or Check changes for Git diffs — or copy the prompt below into a project chat to start.',
+                    ),
+                    ...(!report?.hasScan
+                        ? {
+                              prompt: t(
+                                  '检查这个项目的安全问题，给出触发条件、文件位置和脱敏证据',
+                                  'Check this project for security issues with triggers, file locations, and redacted evidence',
+                              ),
+                              promptLabel: t('复制：检查这个项目', 'Copy: Check this project'),
+                          }
+                        : {}),
+                },
+                {
+                    id: 'findings',
+                    selector: '#' + secTabsId + '-tab-findings',
+                    fallback: '.secw-filter-menu',
+                    side: 'bottom',
+                    title: t('核对触发条件与脱敏代码证据', 'Inspect triggers & redacted evidence'),
+                    desc: t(
+                        '在「检查结果」按新增或高风险筛选，核对文件行号、数据流/模式说明与脱敏代码片段，并可一键复制修复指令发回聊天。',
+                        'Filter by New or High risk in Findings, inspect file lines and redacted snippets, and copy a 1-click fix prompt into chat.',
+                    ),
+                },
+                {
+                    id: 'dependencies',
+                    selector: '#' + secTabsId + '-tab-dependencies',
+                    fallback: '[data-tour="sec-scan"]',
+                    side: 'bottom',
+                    title: t('依赖漏洞离线/联网核查', 'Offline & online dependency audits'),
+                    desc: t(
+                        '在「依赖检查」盘点锁文件依赖，按需切换本地离线数据库或联网查询 OSV 已知漏洞（不上传项目源码）。',
+                        'Inventory lockfile packages in Dependencies and audit against a local database or online OSV (source code is never uploaded).',
+                    ),
+                },
+                {
+                    id: 'verify',
+                    selector: '[data-tour="sec-verify"]',
+                    fallback: '#' + secTabsId + '-tab-settings',
+                    side: 'bottom',
+                    title: t('修复后点击「复查修复」闭环验证', 'Click “Recheck fixes” to close the loop'),
+                    desc: t(
+                        '助手修完问题后，点「复查修复」对同一范围重验问题是否关闭且无新增，也可在「工具与设置」接入可选增强引擎。',
+                        'After patching, click Recheck fixes on the same scope to confirm closure, or configure optional engines in Tools and settings.',
+                    ),
+                },
             ];
 
             return h(W.Page, {
@@ -273,10 +329,20 @@ let securityHostContext;
                 subtitle: t('检查改动、核对证据并跟踪修复。', 'Check changes, review evidence and track fixes.'),
                 className: 'secw security-workbench',
                 toolbar: projectToolbar,
+                tourSteps: securityTourSteps,
+                tourStorageKey: 'dsh-code-security.tour.v1',
+                modalOpen: Boolean(switchTo),
+                onTourCopyPrompt: async text => {
+                    const ok = await W.writeClipboardText(text);
+                    if (ok) {
+                        setNotice(t('已复制指令，粘贴到对话发送即可。', 'Prompt copied — paste into chat.'));
+                    }
+                    return ok;
+                },
                 actions: catalog.length ? h(React.Fragment, null,
-                    h(W.Button, { variant: 'primary', icon: 'shield', disabled, onClick: () => run('scan') }, t('检查代码', 'Scan code')),
+                    h(W.Button, { variant: 'primary', icon: 'shield', 'data-tour': 'sec-scan', disabled, onClick: () => run('scan') }, t('检查代码', 'Scan code')),
                     h(W.Button, { icon: 'search', disabled, onClick: () => run('diff') }, t('检查改动', 'Check changes')),
-                    h(W.Button, { icon: 'check', disabled: disabled || !report?.hasScan, onClick: () => run('verify') }, t('复查修复', 'Recheck fixes')),
+                    h(W.Button, { icon: 'check', 'data-tour': 'sec-verify', disabled: disabled || !report?.hasScan, onClick: () => run('verify') }, t('复查修复', 'Recheck fixes')),
                     h(W.IconButton, { icon: 'refresh', spinning: busy || loading, label: t('刷新结果', 'Refresh results'), disabled: busy || loading || dirty, onClick: () => open(id) })) : null,
             },
                 h('style', { 'data-plugin-css': 'dsh-code-security/workbench' }, SECURITY_WORKBENCH_CSS),
@@ -289,43 +355,40 @@ let securityHostContext;
                 result?.coverage && 'closedCount' in result && result.complete === false ? h('div', { className: 'secw-banner-wrap' }, h(Coverage, { rows: Array.isArray(result.coverage) ? result.coverage : [result.coverage] })) : null,
                 result?.configurationError ? h(W.Status, { tone: 'error' }, message(result.configurationError)) : null,
                 result && 'closedCount' in result ? h(W.Status, { tone: result.complete === false ? 'warn' : 'success' }, result.complete === false ? t('复查未完成，未判定任何问题已修复。', 'Recheck incomplete. No finding was marked fixed.') : t('本次复查：关闭 ', 'This recheck: closed ') + result.closedCount + ' · ' + t('仍存在 ', 'remaining ') + result.remainingCount + ' · ' + t('新增 ', 'new ') + result.freshCount) : null,
-                !catalog.length ? h('div', { className: 'secw-empty-wrap' },
-                    h(W.Empty, {
-                        title: loading ? t('正在载入…', 'Loading…') : t('还没有检查过的项目', 'No checked projects yet'),
-                        icon: 'shield',
-                        action: !loading ? h('div', { className: 'secw-empty-stack' },
-                            h('div', { className: 'dsh-wb-prompt-chips' },
-                                h(SecurityPromptChip, {
-                                    variant: 'primary',
-                                    prompt: t(
-                                        '检查这个项目的安全问题，给出触发条件、文件位置和脱敏证据',
-                                        'Check this project for security issues with triggers, file locations, and redacted evidence',
-                                    ),
-                                    label: t('复制：检查这个项目', 'Copy: Check this project'),
-                                }),
-                                h(SecurityPromptChip, {
-                                    prompt: t(
-                                        '审查当前 Git 改动的安全问题，只报告有触发条件和代码证据的结果',
-                                        'Review current Git changes for security issues with concrete triggers and code evidence',
-                                    ),
-                                    label: t('复制：审查 Git 改动', 'Copy: Check Git diff'),
-                                }),
-                                h(W.Button, { icon: 'refresh', onClick: () => {
-                                    setLoading(true);
-                                    request({ operation: 'list' }).then(v => {
-                                        if (!mounted.current) return;
-                                        setCatalog(v.workspaces);
-                                        if (v.workspaces[0]) void open(v.workspaces[0].id);
-                                        else setLoading(false);
-                                    }).catch(e => {
-                                        if (mounted.current) { setError(message(e.message)); setLoading(false); }
-                                    });
-                                } }, t('刷新项目', 'Refresh projects')))) : null,
-                    }, t('一键复制下方指令发到目标仓库对话即可启动首次检查，项目随后会自动出现在这里。', 'Copy a prompt below in one click and send it in a project chat — the project will appear here automatically.')),
-                    !loading ? h('div', { className: 'secw-guide-wrap' }, h(SecurityWorkflowGuide, { defaultOpen: true })) : null) :
-                h(React.Fragment, null,
-                    h('div', { className: 'secw-guide-wrap' }, h(SecurityWorkflowGuide, { defaultOpen: false })),
-                    h(W.Tabs, {
+                !catalog.length ? h(W.Empty, {
+                    title: loading ? t('正在载入…', 'Loading…') : t('还没有检查过的项目', 'No checked projects yet'),
+                    icon: 'shield',
+                    action: !loading ? h('div', { className: 'secw-empty-stack' },
+                        h('div', { className: 'dsh-wb-prompt-chips' },
+                            h(SecurityPromptChip, {
+                                variant: 'primary',
+                                prompt: t(
+                                    '检查这个项目的安全问题，给出触发条件、文件位置和脱敏证据',
+                                    'Check this project for security issues with triggers, file locations, and redacted evidence',
+                                ),
+                                label: t('复制：检查这个项目', 'Copy: Check this project'),
+                            }),
+                            h(SecurityPromptChip, {
+                                prompt: t(
+                                    '审查当前 Git 改动的安全问题，只报告有触发条件和代码证据的结果',
+                                    'Review current Git changes for security issues with concrete triggers and code evidence',
+                                ),
+                                label: t('复制：审查 Git 改动', 'Copy: Check Git diff'),
+                            }),
+                            h(W.Button, { icon: 'refresh', onClick: () => {
+                                setLoading(true);
+                                request({ operation: 'list' }).then(v => {
+                                    if (!mounted.current) return;
+                                    setCatalog(v.workspaces);
+                                    if (v.workspaces[0]) void open(v.workspaces[0].id);
+                                    else setLoading(false);
+                                }).catch(e => {
+                                    if (mounted.current) { setError(message(e.message)); setLoading(false); }
+                                });
+                            } }, t('刷新项目', 'Refresh projects')))) : null,
+                }, t('一键复制下方指令发到目标仓库对话即可启动首次检查，项目随后会自动出现在这里。', 'Copy a prompt below in one click and send it in a project chat — the project will appear here automatically.')) :
+                h(W.Tabs, {
+                    id: secTabsId,
                     label: t('代码安全视图', 'Code security views'),
                     value: activeTab,
                     onChange: setActiveTab,
@@ -429,7 +492,7 @@ let securityHostContext;
                                     h('p', null, v.summary),
                                     h('p', { className: 'secw-muted' }, t('修复版本：', 'Fixed versions: ') + (v.fixedVersions?.join(', ') || t('暂无', 'Not available'))),
                                     h(ExternalLink, { href: v.url }, v.id)))) : null) : null)
-                    : h(SecurityResults, { report, findings, fresh, filter, setFilter, limit, setLimit, busy, loading, disabled, onRun: run, download, copiedId, onOpen: f => location(f, false), onCopy: f => location(f, true) }))),
+                    : h(SecurityResults, { report, findings, fresh, filter, setFilter, limit, setLimit, busy, loading, disabled, onRun: run, download, copiedId, onOpen: f => location(f, false), onCopy: f => location(f, true) })),
                 !catalog.length ? updateControls : null,
                 switchTo ? h(W.Dialog, {
                     title: t('设置尚未保存', 'Unsaved settings'),
