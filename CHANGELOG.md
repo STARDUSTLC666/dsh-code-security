@@ -1,5 +1,10 @@
 # 更新记录
 
+## 0.8.4 (2026-11-18)
+
+- 同步 `@stardustlc/dsh-updates` 0.2.3：侧边栏工作台平时默认隐藏底部更新栏（零高度占用），仅在检测到兼容新版本或执行更新时浮现单行精简提示条；完整更新设置与检查入口统一保留在 DSH「插件」详情页底部。
+- Sync `@stardustlc/dsh-updates` 0.2.3: keep the sidebar workbench update footer hidden by default when up-to-date, surfacing a single-line compact strip only for actionable updates or active jobs while retaining full controls in native Plugin Details.
+
 ## 0.8.3 (2026-11-18)
 
 - 未扫描项目空状态内置「检查代码 / 检查改动」主操作按钮，漏洞卡片新增一键「复制修复指令」，并补齐可折叠四步安全巡检闭环指引与场景指令。
