@@ -65,7 +65,23 @@ function SecurityResults({
   const [selectedId, setSelectedId] = useState(null);
   const active = findings.find(finding => finding.id === selectedId) || findings[0];
   const visible = findings.slice(0, limit);
-  if (loading && !report) return h(W.Empty, { title: t('正在载入…', 'Loading…'), icon: 'shield' });
+  if (loading && !report) {
+    return h(
+      'div',
+      { className: 'secw-skeleton-split dsh-split-pane' },
+      h(
+        'div',
+        { className: 'secw-skeleton-list dsh-split-leading', style: { '--dsh-split-size': '370px' } },
+        [0, 1, 2, 3, 4].map(i => h(W.Skeleton, { key: i, variant: 'row' })),
+      ),
+      h(
+        'div',
+        { className: 'secw-skeleton-detail dsh-split-trailing' },
+        h(W.Skeleton, { variant: 'card', label: t('正在载入检查结果…', 'Loading scan results…') }),
+        h(W.Skeleton, { variant: 'text', lines: 4 }),
+      ),
+    );
+  }
   if (!report?.hasScan) {
     const actionDisabled = Boolean(disabled || busy || loading);
     return h(
@@ -180,6 +196,10 @@ function SecurityResults({
     ),
     h(W.Split, {
       listWidth: 370,
+      splitKey: 'dsh-code-security:split-width',
+      minWidth: 260,
+      maxWidth: 560,
+      resizerLabel: t('调整问题列表宽度', 'Resize findings list'),
       selected: selectedId && findings.some(finding => finding.id === selectedId) ? selectedId : null,
       onBack: () => setSelectedId(null),
       backLabel: t('返回问题列表', 'Back to findings'),
@@ -202,6 +222,13 @@ function SecurityResults({
             },
           }),
         ),
+        busy
+          ? h(
+              'div',
+              { className: 'secw-busy-skeleton' },
+              h(W.Skeleton, { variant: 'row', label: t('正在更新检查结果…', 'Updating scan results…') }),
+            )
+          : null,
         visible.map(finding =>
           h(W.Row, {
             key: finding.id,
@@ -213,6 +240,23 @@ function SecurityResults({
             statusTone: finding.severity,
             onClick: () => setSelectedId(finding.id),
             className: 'security-list-' + finding.severity,
+            actions: h(
+              React.Fragment,
+              null,
+              h(W.IconButton, {
+                icon: copiedId === finding.id ? 'check' : 'copy',
+                copied: copiedId === finding.id,
+                label: copiedId === finding.id ? t('已复制', 'Copied') : t('复制位置', 'Copy location'),
+                'data-sec-quick-action': 'copy',
+                onClick: () => onCopy?.(finding),
+              }),
+              h(W.IconButton, {
+                icon: 'external',
+                label: t('打开文件', 'Open file'),
+                'data-sec-quick-action': 'open',
+                onClick: () => onOpen?.(finding),
+              }),
+            ),
           }),
         ),
         !findings.length ? h(W.Empty, { title: t('此筛选下没有问题。', 'No findings match this filter.'), icon: 'shield' }) : null,
@@ -261,35 +305,64 @@ const SECURITY_WORKBENCH_CSS = `
   min-width: 0;
 }
 
-.security-workbench .security-project {
-  display: flex;
+.security-workbench .security-project-inline {
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  width: min(100%, 540px);
-}
-
-.security-workbench .security-project-label {
-  flex: none;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--w-muted);
+  min-width: 110px;
+  max-width: 170px;
 }
 
 .security-workbench .security-project-menu {
-  flex: 1;
-  min-width: 220px;
+  width: 100%;
+  min-width: 110px;
 }
 
 .security-workbench .security-report-meta {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 12px 18px 2px;
+  gap: 2px;
+  padding: 8px 16px 2px;
 }
 
 .security-workbench .security-report-meta p {
   margin: 0;
+}
+
+.security-workbench .secw-busy-progress {
+  margin-block-start: 6px;
+}
+
+.security-workbench .secw-busy-skeleton {
+  padding: 4px 8px;
+  border-block-end: var(--dsh-control-border-width, 0.5px) solid var(--w-border);
+}
+
+.security-workbench .secw-skeleton-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px;
+  max-width: 680px;
+}
+
+.security-workbench .secw-skeleton-split {
+  flex: 1;
+  min-height: 0;
+}
+
+.security-workbench .secw-skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border-inline-end: var(--dsh-control-border-width, 0.5px) solid var(--w-border);
+}
+
+.security-workbench .secw-skeleton-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 24px;
 }
 
 .security-workbench .secw-muted {
@@ -327,7 +400,7 @@ const SECURITY_WORKBENCH_CSS = `
 
 .security-workbench .secw-file {
   margin: 0;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-family: var(--dsh-font-mono, ui-monospace, SFMono-Regular, Consolas, monospace);
   font-size: 12.5px;
   color: var(--w-muted);
   overflow-wrap: anywhere;
@@ -345,7 +418,7 @@ const SECURITY_WORKBENCH_CSS = `
   border: var(--dsh-control-border-width, 0.5px) solid var(--w-border-strong);
   background: var(--w-bg-1);
   color: var(--w-ink);
-  font: 12.5px/1.65 ui-monospace, SFMono-Regular, Consolas, monospace;
+  font: 12.5px/1.65 var(--dsh-font-mono, ui-monospace, SFMono-Regular, Consolas, monospace);
 }
 
 .security-workbench .secw-section {

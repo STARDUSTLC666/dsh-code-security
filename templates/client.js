@@ -54,12 +54,12 @@ let securityHostContext;
         function FindingCard({ finding, fresh, copied, onOpen, onCopy }) {
             const { title, detail } = describeFinding(finding);
             return h('article', { className: 'secw-finding-detail', 'data-severity': finding.severity },
-                h('h2', { className: 'secw-detail-title', 'data-dsh-editorial-heading': '' }, title),
+                h('h2', { className: 'secw-detail-title', 'data-dsh-editorial-heading': '', 'data-dsh-serif': '' }, title),
                 h('div', { className: 'secw-detail-meta' },
                     h('span', { className: 'dsh-wb-tag', 'data-tone': finding.severity }, risk(finding.severity)),
                     h('span', { className: 'dsh-wb-tag', 'data-tone': fresh ? 'warn' : undefined }, fresh ? t('新增', 'New') : t('已接受', 'Accepted'))),
                 h('p', { className: 'secw-file' }, finding.file + ':' + finding.line),
-                h('pre', { className: 'secw-evidence', 'aria-label': t('脱敏证据', 'Redacted evidence') }, finding.snippet),
+                h('pre', { className: 'secw-evidence', 'data-dsh-card': '', 'aria-label': t('脱敏证据', 'Redacted evidence') }, finding.snippet),
                 h('section', { className: 'secw-section' },
                     h('h3', null, t('证据与说明', 'Evidence and explanation')),
                     h('p', null, detail),
@@ -243,8 +243,7 @@ let securityHostContext;
             const updateControls = typeof __stardustUpdatesFooter === 'function'
               ? __stardustUpdatesFooter(React, 'dsh-code-security') : null;
 
-            const projectToolbar = catalog.length ? h('div', { className: 'security-project', 'data-tour': 'sec-project' },
-                h('span', { className: 'security-project-label', id: controlId + '-project-label' }, t('项目', 'Project')),
+            const projectSwitcher = catalog.length ? h('div', { className: 'security-project-inline', 'data-tour': 'sec-project' },
                 h(W.ChoiceMenu, {
                     id: controlId + '-project',
                     icon: 'folder',
@@ -326,9 +325,18 @@ let securityHostContext;
                 icon: 'shield',
                 lang: english() ? 'en' : 'zh',
                 title: t('代码安全', 'Code security'),
-                subtitle: t('检查改动、核对证据并跟踪修复。', 'Check changes, review evidence and track fixes.'),
                 className: 'secw security-workbench',
-                toolbar: projectToolbar,
+                navigation: catalog.length ? h(W.Tabs, {
+                    id: secTabsId,
+                    label: t('代码安全视图', 'Code security views'),
+                    value: activeTab,
+                    onChange: setActiveTab,
+                    items: [
+                        { id: 'findings', label: t('检查结果', 'Findings'), count: report?.findings?.length },
+                        { id: 'dependencies', label: t('依赖检查', 'Dependencies') },
+                        { id: 'settings', label: t('工具与设置', 'Tools and settings') },
+                    ],
+                }) : null,
                 tourSteps: securityTourSteps,
                 tourStorageKey: 'dsh-code-security.tour.v1',
                 modalOpen: Boolean(switchTo),
@@ -340,6 +348,7 @@ let securityHostContext;
                     return ok;
                 },
                 actions: catalog.length ? h(React.Fragment, null,
+                    projectSwitcher,
                     h(W.Button, { variant: 'primary', icon: 'shield', 'data-tour': 'sec-scan', disabled, onClick: () => run('scan') }, t('检查代码', 'Scan code')),
                     h(W.Button, { icon: 'search', disabled, onClick: () => run('diff') }, t('检查改动', 'Check changes')),
                     h(W.Button, { icon: 'check', 'data-tour': 'sec-verify', disabled: disabled || !report?.hasScan, onClick: () => run('verify') }, t('复查修复', 'Recheck fixes')),
@@ -351,14 +360,22 @@ let securityHostContext;
                 loading && data && pendingId && pendingId !== id ? h(W.Status, null, t('正在载入所选项目，载入完成前下面是上一个项目的结果。', 'Loading the selected project. The results below are still from the previous project until it finishes.')) : null,
                 busy ? h(W.Status, {
                     action: h(W.Button, { icon: 'close', onClick: () => request({ operation: 'cancel', id, job: job.id }).catch(e => setError(message(e.message))) }, t('取消检查', 'Cancel check')),
-                }, t('正在检查，可以关闭面板，稍后回来查看结果。', 'Checking. You can close this panel and return for the result.')) : null,
+                },
+                    h('span', null, t('正在检查，可以关闭面板，稍后回来查看结果。', 'Checking. You can close this panel and return for the result.')),
+                    h('div', { className: 'dsh-progress secw-busy-progress', 'aria-hidden': 'true' },
+                        h('div', { className: 'dsh-progress-bar', style: { '--dsh-progress-value': '65%' } }))) : null,
                 result?.coverage && 'closedCount' in result && result.complete === false ? h('div', { className: 'secw-banner-wrap' }, h(Coverage, { rows: Array.isArray(result.coverage) ? result.coverage : [result.coverage] })) : null,
                 result?.configurationError ? h(W.Status, { tone: 'error' }, message(result.configurationError)) : null,
                 result && 'closedCount' in result ? h(W.Status, { tone: result.complete === false ? 'warn' : 'success' }, result.complete === false ? t('复查未完成，未判定任何问题已修复。', 'Recheck incomplete. No finding was marked fixed.') : t('本次复查：关闭 ', 'This recheck: closed ') + result.closedCount + ' · ' + t('仍存在 ', 'remaining ') + result.remainingCount + ' · ' + t('新增 ', 'new ') + result.freshCount) : null,
-                !catalog.length ? h(W.Empty, {
-                    title: loading ? t('正在载入…', 'Loading…') : t('还没有检查过的项目', 'No checked projects yet'),
+                !catalog.length && loading ? h('div', { className: 'secw-skeleton-wrap' },
+                    h(W.Skeleton, { variant: 'card', label: t('正在载入项目…', 'Loading projects…') }),
+                    h(W.Skeleton, { variant: 'row' }),
+                    h(W.Skeleton, { variant: 'row' }),
+                    h(W.Skeleton, { variant: 'row' }))
+                : !catalog.length ? h(W.Empty, {
+                    title: t('还没有检查过的项目', 'No checked projects yet'),
                     icon: 'shield',
-                    action: !loading ? h('div', { className: 'secw-empty-stack' },
+                    action: h('div', { className: 'secw-empty-stack' },
                         h('div', { className: 'dsh-wb-prompt-chips' },
                             h(SecurityPromptChip, {
                                 variant: 'primary',
@@ -385,20 +402,9 @@ let securityHostContext;
                                 }).catch(e => {
                                     if (mounted.current) { setError(message(e.message)); setLoading(false); }
                                 });
-                            } }, t('刷新项目', 'Refresh projects')))) : null,
+                            } }, t('刷新项目', 'Refresh projects')))),
                 }, t('一键复制下方指令发到目标仓库对话即可启动首次检查，项目随后会自动出现在这里。', 'Copy a prompt below in one click and send it in a project chat — the project will appear here automatically.')) :
-                h(W.Tabs, {
-                    id: secTabsId,
-                    label: t('代码安全视图', 'Code security views'),
-                    value: activeTab,
-                    onChange: setActiveTab,
-                    footer: updateControls,
-                    items: [
-                        { id: 'findings', label: t('检查结果', 'Findings'), count: report?.findings?.length },
-                        { id: 'dependencies', label: t('依赖检查', 'Dependencies') },
-                        { id: 'settings', label: t('工具与设置', 'Tools and settings') },
-                    ],
-                },
+                h(W.TabPanel, { key: activeTab, id: secTabsId, activeTab },
                     activeTab === 'settings' ? h('section', { className: 'security-settings' },
                         h('div', null,
                             h('h3', null, t('增强工具与自动检查', 'Enhanced tools and automatic checks')),
@@ -458,6 +464,7 @@ let securityHostContext;
                             h(W.Button, { icon: 'close', disabled: busy || !dirty, onClick: () => { setSettings(data.settings); setAutoCheck(data.workspace.autoCheck); setDirty(false); } }, t('取消修改', 'Cancel edits')),
                             h(W.Button, { icon: 'shield', disabled, onClick: () => run('health') }, t('检查工具', 'Check tools'))),
                         dirty ? h('p', { className: 'secw-muted' }, t('设置尚未保存，请保存后再检查。', 'Save your settings before starting a check.')) : null,
+                        busy && !result?.checks && !result?.engines ? h(W.Skeleton, { variant: 'card', label: t('正在检查工具…', 'Checking tools…') }) : null,
                         result?.engines ? h(Coverage, { rows: result.engines }) : null,
                         result?.checks ? h(HealthReport, { result }) : null,
                         result?.database ? h('div', { className: 'secw-field-card', 'data-dsh-card': '' },
@@ -481,6 +488,7 @@ let securityHostContext;
                             }),
                             h('div', { className: 'secw-tools' },
                                 h(W.Button, { variant: 'primary', icon: 'search', disabled, onClick: () => run('deps') }, t('检查依赖', 'Check dependencies')))),
+                        busy && !result?.dependencies ? h(W.Skeleton, { variant: 'card', label: t('正在检查依赖…', 'Checking dependencies…') }) : null,
                         result?.dependencies ? h('div', { className: 'secw-vuln-list' },
                             h('p', null, t('发现依赖：', 'Dependencies: ') + (result.dependenciesTotal ?? result.dependencies.length)),
                             ...(result.warnings || []).map((warning, i) => h(W.Status, { key: i, tone: 'warn', className: 'secw-inline-status' }, message(warning))),
@@ -493,7 +501,7 @@ let securityHostContext;
                                     h('p', { className: 'secw-muted' }, t('修复版本：', 'Fixed versions: ') + (v.fixedVersions?.join(', ') || t('暂无', 'Not available'))),
                                     h(ExternalLink, { href: v.url }, v.id)))) : null) : null)
                     : h(SecurityResults, { report, findings, fresh, filter, setFilter, limit, setLimit, busy, loading, disabled, onRun: run, download, copiedId, onOpen: f => location(f, false), onCopy: f => location(f, true) })),
-                !catalog.length ? updateControls : null,
+                updateControls,
                 switchTo ? h(W.Dialog, {
                     title: t('设置尚未保存', 'Unsaved settings'),
                     tone: 'warn',

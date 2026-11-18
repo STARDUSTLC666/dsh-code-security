@@ -49,6 +49,7 @@ function createMockEnv({ withHostPrimitives = false, storageThrows = false, init
   const headStyles = []
   const mockDocument = {
     baseURI: 'http://127.0.0.1:4321/',
+    documentElement: makeDomElement('html'),
     head: {
       appendChild(el) {
         headStyles.push(el)
@@ -65,7 +66,7 @@ function createMockEnv({ withHostPrimitives = false, storageThrows = false, init
       return null
     },
     querySelectorAll(selector) {
-      if (selector === '[data-dsh-portal-synced]') return [...syncedNodes]
+      if (selector.includes('[data-dsh-portal-synced]')) return [...syncedNodes]
       return []
     },
   }
@@ -258,6 +259,7 @@ function createMockEnv({ withHostPrimitives = false, storageThrows = false, init
     React,
     client,
     storage,
+    mockDocument,
     dispatchedEvents,
     makeDomElement,
     renderTree,
@@ -304,7 +306,11 @@ test('Workbench UI v2 lazily loads @deepseek-ai/dsh-client-ui-primitives only on
   assert.ok(env.getPrimitivesRequireCount() > 0, 'host primitives are resolved lazily during render')
   assert.equal(pageTree.type, 'section')
   assert.equal(pageTree.props['data-dsh-style'], 'harness')
+  assert.equal(pageTree.props['data-dsh-font'], 'arcade')
   assert.equal(pageTree.props['data-main'], 'true')
+
+  const fontTrigger = env.findAll(pageTree, n => n.type === 'HostButton' && String(n.props?.className || '').includes('dsh-font-trigger'))[0]
+  assert.ok(fontTrigger, 'renders compact FontSwitcher trigger beside StyleSwitcher')
 
   const hostButtons = env.findAll(pageTree, n => n.type === 'HostButton')
   assert.ok(hostButtons.length >= 3, 'uses host Button for FindingCard actions and header StyleSwitcher')
@@ -325,13 +331,18 @@ test('Workbench UI v2 lazily loads @deepseek-ai/dsh-client-ui-primitives only on
   env.cleanup()
 })
 
-test('Standalone fallback mode renders semantic HTML controls and syncs all 5 [data-dsh-style] presets + portaled dialogs', () => {
+test('Standalone fallback mode renders semantic HTML controls and syncs all 13 [data-dsh-style] presets, 8 [data-dsh-font] pairings, and portaled dialogs', () => {
   const env = createMockEnv({ withHostPrimitives: false })
   const { W } = env.client.probe
 
   assert.deepEqual(
     Array.from(W.DSH_STYLES, s => s.id),
-    ['harness', 'cream', 'claude', 'pixel8bit', 'mint'],
+    ['harness', 'cream', 'claude', 'pixel8bit', 'mint', 'glass', 'eink', 'blueprint', 'risograph', 'win98', 'songhui', 'frutiger', 'gazette'],
+  )
+  assert.equal(W.DSH_DEFAULT_FONT, 'arcade')
+  assert.deepEqual(
+    Array.from(W.DSH_FONTS, f => f.id),
+    ['arcade', 'auto', 'songkai', 'fangsong', 'poster', 'retro98', 'serif', 'modern'],
   )
 
   // Mount a simulated portaled dialog outer <div role="dialog"> without data-dsh-style
@@ -352,10 +363,11 @@ test('Standalone fallback mode renders semantic HTML controls and syncs all 5 [d
   assert.equal(typeof frameNode.props.ref, 'function')
   frameNode.props.ref(innerDialogDom)
   assert.equal(outerDialogDom.getAttribute('data-dsh-style'), 'harness')
+  assert.equal(outerDialogDom.getAttribute('data-dsh-font'), 'arcade')
   assert.equal(outerDialogDom.getAttribute('data-window-drag-exclude'), '')
 
-  // Cycle through all 5 styles and verify localStorage + custom event + portaled dialog sync
-  for (const styleId of ['cream', 'claude', 'pixel8bit', 'mint', 'harness']) {
+  // Cycle through all 13 styles and verify localStorage + custom event + portaled dialog sync
+  for (const styleId of ['cream', 'claude', 'pixel8bit', 'mint', 'glass', 'eink', 'blueprint', 'risograph', 'win98', 'songhui', 'frutiger', 'gazette', 'harness']) {
     env.resetState()
     const applied = W.writeDshStyle(styleId)
     assert.equal(applied, styleId)
@@ -367,12 +379,31 @@ test('Standalone fallback mode renders semantic HTML controls and syncs all 5 [d
       env.React.createElement(W.Page, { workbench: true, title: '代码安全', icon: 'shield' }, 'body'),
     ))
     assert.equal(page.props['data-dsh-style'], styleId)
+    assert.equal(page.props['data-dsh-font'], 'arcade')
+  }
+
+  // Cycle through all 8 font pairings and verify localStorage + custom event + root + portaled dialog sync
+  for (const fontId of ['auto', 'songkai', 'fangsong', 'poster', 'retro98', 'serif', 'modern', 'arcade']) {
+    env.resetState()
+    const appliedFont = W.writeDshFont(fontId)
+    assert.equal(appliedFont, fontId)
+    assert.equal(env.storage.get('dsh-stardust:ui-font'), fontId)
+    assert.equal(env.mockDocument.documentElement.getAttribute('data-dsh-font'), fontId)
+    assert.equal(outerDialogDom.getAttribute('data-dsh-font'), fontId, 'portaled dialog updates font to ' + fontId)
+    assert.equal(env.dispatchedEvents.at(-1)?.detail?.font, fontId)
+
+    const page = env.expand(env.renderTree(() =>
+      env.React.createElement(W.Page, { workbench: true, title: '代码安全', icon: 'shield' }, 'body'),
+    ))
+    assert.equal(page.props['data-dsh-font'], fontId)
   }
 
   // Restricted storage fallback does not throw
   const restricted = createMockEnv({ withHostPrimitives: false, storageThrows: true })
   assert.equal(restricted.client.probe.W.readDshStyle(), 'harness')
   assert.equal(restricted.client.probe.W.writeDshStyle('claude'), 'claude')
+  assert.equal(restricted.client.probe.W.readDshFont(), 'arcade')
+  assert.equal(restricted.client.probe.W.writeDshFont('songkai'), 'songkai')
   env.cleanup()
   restricted.cleanup()
 })
@@ -381,7 +412,7 @@ function dispatchedStyleOf(events) {
   return events.at(-1)?.detail?.style
 }
 
-test('Design system CSS enforces Never-Too-Dark slate, 5 palettes, clearances, micro-animations, reduced-motion, and update footer', () => {
+test('Design system CSS enforces Never-Too-Dark slate, 13 palettes, 8 font pairings, materiality, v3 layout primitives, and update footer', () => {
   const rawBundle = readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8')
   const env = createMockEnv({ withHostPrimitives: false })
   const css = env.client.probe.W.styles
@@ -393,17 +424,47 @@ test('Design system CSS enforces Never-Too-Dark slate, 5 palettes, clearances, m
   assert.match(cssRules, /body\[data-ds-dark-theme\][\s\S]*?#272c36/i)
   assert.doesNotMatch(cssRules, /#090a0f|#0b0d13|#000000/i)
 
-  // 2. All 5 switchable [data-dsh-style] themes
-  for (const preset of ['harness', 'cream', 'claude', 'pixel8bit', 'mint']) {
+  // 2. All 13 switchable [data-dsh-style] themes + deepened materiality
+  for (const preset of ['harness', 'cream', 'claude', 'pixel8bit', 'mint', 'glass', 'eink', 'blueprint', 'risograph', 'win98', 'songhui', 'frutiger', 'gazette']) {
     assert.ok(css.includes(`[data-dsh-style="${preset}"]`), `missing CSS scope for ${preset}`)
   }
   assert.match(css, /#faf7f0/i, 'cream daylight paper')
+  assert.match(css, /3px 3px 0 #ebe3d1/i, 'cream stacked-paper shadow')
   assert.match(css, /#c96442/i, 'claude terracotta accent')
+  assert.match(css, /\[data-dsh-serif\]/i, 'claude editorial serif')
   assert.match(css, /translate:\s*1px 1px/i, 'pixel8bit stepped press')
   assert.match(css, /steps\(2,\s*end\)/i, 'pixel8bit stepped timing')
+  assert.match(css, /\.dsh-pixel-cursor/i, 'pixel8bit active row cursor')
   assert.match(css, /#0f766e/i, 'mint teal accent')
+  assert.match(css, /#f3f7ff/i, 'glass aurora daylight base')
+  assert.match(css, /blur\(14px\)/i, 'glass frosted blur')
+  assert.match(css, /#f2f1ec/i, 'eink warm matte e-paper')
+  assert.match(css, /#eaf3fb/i, 'blueprint cyanotype grid')
+  assert.match(css, /#ff3e7f/i, 'risograph electric pink')
+  assert.match(css, /#dcdcdc/i, 'win98 platinum bevel')
+  assert.match(css, /#b83b2a/i, 'songhui cinnabar seal')
+  assert.match(css, /#eaf7ff/i, 'frutiger aqua gloss')
+  assert.match(css, /#f6f3ec/i, 'gazette newsprint base')
+  assert.match(css, /4px double #161514/i, 'gazette masthead double rule')
+  assert.match(css, /#9b1c1c/i, 'gazette crimson seal accent')
 
-  // 3. Window clearances & v0.2.2-rc.1 data-window-drag-exclude contract
+  // 2b. Dual-layer typography variables, 8 [data-dsh-font] rules, and compact FontSwitcher chrome
+  assert.match(cssRules, /--dsh-font-display:/)
+  assert.match(cssRules, /--dsh-font-body:/)
+  assert.match(cssRules, /--dsh-font-mono:/)
+  for (const fontId of ['songkai', 'fangsong', 'poster', 'retro98', 'serif', 'arcade', 'modern']) {
+    assert.ok(cssRules.includes(`[data-dsh-font="${fontId}"]`), `missing CSS font override for ${fontId}`)
+  }
+  assert.match(cssRules, /\.dsh-style-switcher/)
+  assert.match(cssRules, /\.dsh-font-trigger/)
+  assert.match(cssRules, /\.dsh-font-glyph/)
+
+  // 3. v3 header, sliding indicator, split resizer, skeleton, quick-action bar, and clearances
+  assert.match(cssRules, /\.dsh-header/)
+  assert.match(cssRules, /\.dsh-tab-indicator/)
+  assert.match(cssRules, /\.dsh-split-resizer/)
+  assert.match(cssRules, /\.dsh-skeleton/)
+  assert.match(cssRules, /\.dsh-row-actions/)
   assert.match(cssRules, /--dsh-frame-top-clearance/)
   assert.match(cssRules, /--dsh-frame-leading-clearance/)
   assert.match(cssRules, /\[data-window-drag-exclude\]\s*\{\s*-webkit-app-region:\s*no-drag/)
@@ -419,9 +480,10 @@ test('Design system CSS enforces Never-Too-Dark slate, 5 palettes, clearances, m
   assert.match(cssRules, /@media\s*\(prefers-reduced-motion:\s*reduce\)/)
   assert.match(cssRules, /@media\s*\(forced-colors:\s*active\)/)
 
-  // 5. Plugin update footer preserved
+  // 5. Plugin update footer preserved & calm compact strip rules present
   assert.ok(rawBundle.includes('data-plugin-update-footer'))
   assert.ok(rawBundle.includes('__stardustUpdatesFooter'))
+  assert.match(cssRules, /\[data-plugin-update-footer\][\s\S]*?min-height:\s*32px/)
   env.cleanup()
 })
 
@@ -429,10 +491,12 @@ test('HostMenuWithStyle & Cordis 4 ctx.effect unload cleanup work cleanly', asyn
   const env = createMockEnv({ withHostPrimitives: true })
   const { W } = env.client.probe
   W.writeDshStyle('pixel8bit')
+  W.writeDshFont('fangsong')
   const P = W.primitives()
   const openMenu = env.expand(env.React.createElement(P.Menu, {
     open: true,
     dshStyle: 'pixel8bit',
+    dshFont: 'fangsong',
     items: [{ id: 'a', label: 'A' }],
     anchor: env.React.createElement('button', null, 'Open'),
   }))
@@ -442,6 +506,7 @@ test('HostMenuWithStyle & Cordis 4 ctx.effect unload cleanup work cleanly', asyn
   const innerSpanDom = env.makeDomElement('span', {}, outerMenuDom)
   syncSpan.props.ref(innerSpanDom)
   assert.equal(outerMenuDom.getAttribute('data-dsh-style'), 'pixel8bit')
+  assert.equal(outerMenuDom.getAttribute('data-dsh-font'), 'fangsong')
   assert.equal(outerMenuDom.getAttribute('data-window-drag-exclude'), '')
   env.cleanup()
 
@@ -584,5 +649,142 @@ test('Unscanned project inline CTAs & interactive CoachmarkTour (? 引导, direc
   assert.equal(env.findAll(suppressedPage, n => n.props?.className === 'dsh-wb-tour-layer').length, 0)
   assert.equal(env.findAll(afterTimer, n => n.props?.className === 'dsh-wb-tour-layer').length, 0, 'modalOpen suppresses auto-tour')
 
+  env.cleanup()
+})
+
+test('UI v3 unified 48px header, sliding tabs, resizable split pane, shimmer skeleton, serif materiality, and row quick actions', () => {
+  const env = createMockEnv({ withHostPrimitives: false })
+  const { W, SecurityResults, FindingCard } = env.client.probe
+
+  // 1. Unified 48px single-row header with inline tabs and no subtitle row
+  const tabsEl = env.React.createElement(W.Tabs, {
+    id: 'sec-v3-tabs',
+    label: '代码安全视图',
+    value: 'findings',
+    onChange() {},
+    items: [
+      { id: 'findings', label: '检查结果', count: 3 },
+      { id: 'dependencies', label: '依赖检查' },
+    ],
+  })
+  const pageTree = env.expand(env.renderTree(() =>
+    env.React.createElement(
+      W.Page,
+      { workbench: true, title: '代码安全', icon: 'shield', navigation: tabsEl },
+      env.React.createElement(W.TabPanel, { id: 'sec-v3-tabs', activeTab: 'findings' }, 'panel-body'),
+    ),
+  ))
+  const header = env.findAll(pageTree, n => n.type === 'header' && Object.hasOwn(n.props || {}, 'data-dsh-header'))[0]
+  assert.ok(header, 'renders unified .dsh-header')
+  assert.equal(env.findAll(pageTree, n => String(n.props?.className || '').includes('dsh-wb-subtitle')).length, 0, 'subtitle row removed for single-row 48px header')
+  assert.ok(env.findAll(header, n => String(n.props?.className || '').includes('dsh-tab-indicator')).length === 1, 'renders sliding tab indicator')
+  assert.ok(env.findAll(pageTree, n => Object.hasOwn(n.props || {}, 'data-dsh-tab-panel')).length === 1, 'renders .dsh-tab-panel for 140ms entrance')
+
+  // 2. Shimmer skeleton when SecurityResults is loading without report
+  env.resetState()
+  const skelTree = env.expand(env.renderTree(() =>
+    env.React.createElement(SecurityResults, { loading: true, report: null, findings: [], fresh: new Set(), limit: 50 }),
+  ))
+  assert.ok(env.findAll(skelTree, n => Object.hasOwn(n.props || {}, 'data-dsh-skeleton')).length >= 3, 'renders DshSkeleton during initial loading')
+
+  // 3. Resizable split pane + row hover quick actions + pixel cursor + [data-dsh-serif]
+  const copied = []
+  const opened = []
+  const sampleFinding = {
+    id: 'f-1',
+    ruleId: 'SEC-001',
+    cwe: 'CWE-78',
+    severity: 'high',
+    confidence: 'high',
+    evidence: 'dataflow',
+    file: 'src/run.ts',
+    line: 42,
+    snippet: 'exec(input)',
+    title: 'Command injection',
+    message: 'Unsafe shell execution',
+  }
+  const renderFindings = () => env.rerenderTree(() =>
+    env.React.createElement(SecurityResults, {
+      report: { hasScan: true, time: '2026-11-18T00:00:00Z', scope: { kind: 'scan', target: '.' }, findings: [sampleFinding] },
+      findings: [sampleFinding],
+      fresh: new Set(['f-1']),
+      limit: 50,
+      busy: false,
+      loading: false,
+      onCopy: f => copied.push(f.id),
+      onOpen: f => opened.push(f.id),
+    }),
+  )
+  env.resetState()
+  let resultsTree = env.renderTree(() =>
+    env.React.createElement(SecurityResults, {
+      report: { hasScan: true, time: '2026-11-18T00:00:00Z', scope: { kind: 'scan', target: '.' }, findings: [sampleFinding] },
+      findings: [sampleFinding],
+      fresh: new Set(['f-1']),
+      limit: 50,
+      busy: false,
+      loading: false,
+      onCopy: f => copied.push(f.id),
+      onOpen: f => opened.push(f.id),
+    }),
+  )
+  const resizer = env.findAll(resultsTree, n => n.props?.role === 'separator' && Object.hasOwn(n.props || {}, 'data-dsh-resizer'))[0]
+  assert.ok(resizer, 'renders DshSplitResizer separator')
+  assert.equal(resizer.props['aria-valuenow'], 370)
+  resizer.props.onKeyDown({ key: 'ArrowRight', preventDefault() {} })
+  resultsTree = renderFindings()
+  const updatedResizer = env.findAll(resultsTree, n => n.props?.role === 'separator' && Object.hasOwn(n.props || {}, 'data-dsh-resizer'))[0]
+  assert.equal(updatedResizer.props['aria-valuenow'], 386)
+  assert.equal(env.storage.get('dsh-code-security:split-width'), '386')
+  updatedResizer.props.onDoubleClick()
+  resultsTree = renderFindings()
+  assert.equal(env.storage.get('dsh-code-security:split-width'), '370')
+
+  const quickCopy = env.findAll(resultsTree, n => n.type === 'button' && n.props?.['data-sec-quick-action'] === 'copy')[0]
+  const quickOpen = env.findAll(resultsTree, n => n.type === 'button' && n.props?.['data-sec-quick-action'] === 'open')[0]
+  assert.ok(quickCopy && quickOpen, 'renders row hover quick actions for copy location and open file')
+  quickCopy.props.onClick()
+  quickOpen.props.onClick()
+  assert.deepEqual(copied, ['f-1'])
+  assert.deepEqual(opened, ['f-1'])
+
+  assert.ok(env.findAll(resultsTree, n => n.props?.className === 'dsh-pixel-cursor').length >= 1, 'renders pixel8bit active cursor')
+  assert.ok(env.findAll(resultsTree, n => Object.hasOwn(n.props || {}, 'data-dsh-serif')).length >= 2, 'stamps [data-dsh-serif] on row & detail titles')
+
+  const cardTree = env.expand(env.React.createElement(FindingCard, { finding: sampleFinding, fresh: true, copied: false, onOpen() {}, onCopy() {} }))
+  assert.ok(env.findAll(cardTree, n => n.type === 'h2' && Object.hasOwn(n.props || {}, 'data-dsh-serif')).length === 1)
+
+  env.cleanup()
+})
+
+test('CoachmarkTour measure() safely escapes React.useId() colon selectors without throwing SyntaxError', () => {
+  const env = createMockEnv({ withHostPrimitives: false })
+  const { W } = env.client.probe
+  const queried = []
+  let capturedLayout = null
+  const fakeTarget = { getBoundingClientRect: () => ({ left: 140, top: 14, width: 88, height: 32 }) }
+  const rootRef = {
+    current: {
+      querySelector(sel) {
+        queried.push(sel)
+        if (sel.startsWith('#:')) throw new SyntaxError(`Failed to execute 'querySelector': '${sel}' is not a valid selector`)
+        if (sel === '[id=":r22:-tabs-tab-findings"]') return fakeTarget
+        return null
+      },
+    },
+  }
+  env.renderTree(() =>
+    env.React.createElement(W.CoachmarkTour, {
+      rootRef,
+      steps: [{ id: 'findings', selector: '#:r22:-tabs-tab-findings', side: 'bottom', title: 'T', desc: 'D' }],
+      step: 0,
+      manual: true,
+      style: 'gazette',
+      font: 'arcade',
+      setLayout: layout => { capturedLayout = layout },
+    }),
+  )
+  assert.deepEqual(queried, ['#:r22:-tabs-tab-findings', '[id=":r22:-tabs-tab-findings"]'])
+  assert.ok(capturedLayout?.spotlight, 'resolves spotlight bounds via escaped [id="..."] selector')
   env.cleanup()
 })
