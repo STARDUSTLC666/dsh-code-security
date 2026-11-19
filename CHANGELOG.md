@@ -1,5 +1,11 @@
 # 更新记录
 
+
+## 0.9.1 (2026-11-19)
+
+- 修复工作台弹窗及备用控件重挂载造成的失焦；原 issue #2 的遮挡场景仍待有效复现信息，不将此版本宣称为该遮挡问题的确认修复。
+- Preserve modal/control identity and focus. The separately reported occlusion scenario still needs reproduction details.
+
 ## 0.9.0 (2026-11-18)
 
 - **Workbench UI v3 + 13 套明亮工作台主题 + 8 套双层中英字体搭配**：
