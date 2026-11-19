@@ -1,6 +1,11 @@
 # 更新记录
 
 
+## 0.9.2 (2026-11-20)
+
+- 在备用弹窗中，子菜单优先处理 Escape，避免误关外层表单。
+- Let nested controls consume Escape before closing a fallback dialog.
+
 ## 0.9.1 (2026-11-19)
 
 - 修复工作台弹窗及备用控件重挂载造成的失焦；原 issue #2 的遮挡场景仍待有效复现信息，不将此版本宣称为该遮挡问题的确认修复。
