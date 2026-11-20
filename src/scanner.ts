@@ -12,6 +12,7 @@ import { languageForFile, RULES, type SecurityRule } from './rules.js'
 import { policyExcludesDir, policyIgnores, type SecurePolicy } from './policy.js'
 import { protectFinding, isHighEntropyToken, evidenceFingerprint } from './privacy.js'
 import { sanitizedHtmlLines } from './syntax.js'
+import { workspaceTarget } from './workspace.js'
 
 export interface Finding {
   endLine?: number
@@ -249,7 +250,7 @@ export function isExcludedPath(rel: string, policy: SecurePolicy): boolean {
 export async function scanPath(options: ScanOptions): Promise<ScanResult> {
   const started = Date.now()
   const { cwd, maxFiles, maxFileBytes, policy } = options
-  const root = options.target !== undefined && options.target.trim() !== '' ? path.resolve(cwd, options.target.trim()) : cwd
+  const root = await workspaceTarget(cwd, options.target?.trim() || '.')
   let filesScanned = 0
   let filesSkipped = 0
   const findings: Finding[] = []

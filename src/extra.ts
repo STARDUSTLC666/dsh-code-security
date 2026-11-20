@@ -5,6 +5,7 @@
  */
 
 import path from 'node:path'
+import { workspaceTarget } from './workspace.js'
 import { optionalString, requiredString, type ResolvedSecureConfig } from './config.js'
 import { scanDeps } from './deps.js'
 import { findingFingerprint, loadState, saveBaseline } from './state.js'
@@ -97,7 +98,7 @@ export function buildExtraTools(cfg: ResolvedSecureConfig, cwd: string, signal?:
       const mode = args.audit ?? 'none'
       if (!['none','offline','online'].includes(String(mode))) throw new Error('audit 只支持 none、offline、online')
       const target = optionalString(args, 'target')
-      const root = path.resolve(cwd, target ?? '.')
+      const root = await workspaceTarget(cwd, target ?? '.')
       const documents: ScanDocument[] = []; let bytes = 0, truncated = false
       const rootDir = (await fs.lstat(root)).isDirectory() ? root : path.dirname(root)
       const inventory = await scanDeps(root, { maxFiles: cfg.maxFiles, maxFileBytes: cfg.maxFileBytes, signal, policy: await loadPolicy(cwd),
