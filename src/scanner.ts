@@ -10,9 +10,9 @@ import { createHash } from 'node:crypto'
 import { DEFAULT_EXCLUDE_DIRS, type Severity } from './config.js'
 import { languageForFile, RULES, type SecurityRule } from './rules.js'
 import { policyExcludesDir, policyIgnores, type SecurePolicy } from './policy.js'
-import { protectFinding, isHighEntropyToken, evidenceFingerprint } from './privacy.js'
+import { protectFinding, isHighEntropyToken, evidenceFingerprint, redactText } from './privacy.js'
 import { sanitizedHtmlLines } from './syntax.js'
-import { workspaceTarget } from './workspace.js'
+import { workspaceTarget, boundedFile } from './workspace.js'
 
 export interface Finding {
   endLine?: number
@@ -129,6 +129,15 @@ function makeId(ruleId: string, file: string, line: number, snippet: string): st
   return 'SR-' + hash
 }
 
+function displayEvidence(ruleId: string, file: string, text: string) {
+  const raw = text.trim()
+  return {
+    // Retain existing acceptance identities while protecting complete values before clipping.
+    fingerprint: evidenceFingerprint({ ruleId, file, snippet: raw.slice(0, 200) }),
+    snippet: redactText(raw).slice(0, 200),
+  }
+}
+
 export interface LineEntry {
   line: number
   text: string
@@ -170,7 +179,7 @@ function scanFileRule(entries: LineEntry[], rel: string, rule: SecurityRule, dis
     return {
       id: makeId(rule.id, rel, line, snippet), ruleId: rule.id, title: rule.title,
       cwe: rule.cwe, severity: rule.severity, confidence: rule.confidence,
-      file: rel, line, snippet: snippet.trim().slice(0, 200), message: rule.message,
+      file: rel, line, ...displayEvidence(rule.id, rel, snippet), message: rule.message,
       ...(fingerprint === undefined ? {} : { fingerprint }),
     }
   }
@@ -216,7 +225,7 @@ export function scanLineSet(entries: LineEntry[], rel: string, policy: SecurePol
         confidence: rule.confidence,
         file: rel,
         line: entry.line,
-        snippet: entry.text.trim().slice(0, 200),
+        ...displayEvidence(rule.id, rel, entry.text),
         message: rule.message,
       })
     }
@@ -302,10 +311,11 @@ export async function scanPath(options: ScanOptions): Promise<ScanResult> {
     }
     let buffer: Uint8Array
     try {
-      buffer = new Uint8Array(await fs.readFile(absolute))
-    } catch {
+      buffer = await boundedFile(absolute, maxFileBytes, options.signal)
+    } catch (error) {
+      options.signal?.throwIfAborted()
       filesSkipped += 1
-      incomplete('无法读取 ' + rel)
+      incomplete((error as NodeJS.ErrnoException).code === 'SCAN_FILE_TOO_LARGE' ? rel + ' 超过文件大小上限' : '无法读取 ' + rel)
       return
     }
     if (fileHasBinary(buffer)) {

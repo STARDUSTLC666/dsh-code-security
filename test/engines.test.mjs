@@ -25,6 +25,16 @@ test('bad or truncated reports and foreign locations never become a successful s
   assert.notEqual(result.coverage.status,'completed');assert.deepEqual(result.findings,[])
  }
 })
+
+test('enhanced source evidence and engine diagnostics redact full credentials before limiting length',async t=>{
+ const dir=await fixture(t),cfg=resolveConfig({},dir)
+ for(const offset of [193,1993]){
+  const runner=fake(async argv=>ok({errors:[],results:[{path:join(argv.at(-1),'a.js'),check_id:'fixture-dataflow',start:{line:1},end:{line:1},extra:{message:'x'.repeat(offset)+' '+secret,severity:'ERROR'}}]}))
+  const result=await scanExternal('semgrep',[{file:'a.js',text:'eval(input);'+' '.repeat(181)+'"'+secret+'";'}],cfg,runner)
+  assert.equal(result.coverage.status,'completed');assert.equal(result.findings.length,1)
+  assert.equal(JSON.stringify(result).includes(secret.slice(0,6)),false)
+ }
+})
 test('external diff results are restricted to added lines, including a multi-line match',async t=>{
  const dir=await fixture(t),cfg=resolveConfig({},dir)
  const result=await scanExternal('betterleaks',[{file:'a.js',text:'one\ntwo\nthree',selectedLines:new Set([3])}],cfg,fake(async argv=>ok([leak(join(argv[2],'a.js'),1),{...leak(join(argv[2],'a.js'),2),EndLine:3}])))

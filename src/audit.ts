@@ -7,6 +7,7 @@ import { policyIgnores } from './policy.js'
 import { GIT_SAFE_CONFIG_ARGS, parseDiff, runGitDiff, scanDiff } from './diff.js'
 import { isExcludedPath, scanPath } from './scanner.js'
 import { mergeFindings, scanExternal, type EngineCoverage, type ScanDocument } from './engines.js'
+import { boundedFile } from './workspace.js'
 
 export type ScanScope = { kind: 'scan'; target?: string } | { kind: 'diff'; target?: string; base: string; staged: boolean; includeUntracked?: boolean }
 export function sourceEngines(value: unknown, defaults: SourceEngine[]): SourceEngine[] {
@@ -39,7 +40,7 @@ export async function runSourceCheck(scope: ScanScope, cfg: ResolvedSecureConfig
           const stat = await fs.lstat(absolute)
           if (!stat.isFile() || stat.isSymbolicLink() || await fs.realpath(absolute) !== absolute) throw new Error('增量文件不是工作区内的普通文件')
           if (stat.size > cfg.maxFileBytes) { truncated = true; continue }
-          text = await fs.readFile(absolute, { encoding: 'utf8', signal })
+          text = (await boundedFile(absolute, cfg.maxFileBytes, signal)).toString('utf8')
         }
         if (Buffer.byteLength(text) > cfg.maxFileBytes) { truncated = true; continue }
         const lines = text.split(/\r?\n/)

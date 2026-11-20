@@ -5,6 +5,7 @@ import { parse as parseToml } from 'smol-toml'
 import { DEFAULT_EXCLUDE_DIRS } from './config.js'
 import { redactText } from './privacy.js'
 import { policyExcludesDir, type SecurePolicy } from './policy.js'
+import { boundedFile } from './workspace.js'
 
 export interface DependencyEntry {
   name: string; spec: string
@@ -111,7 +112,7 @@ export async function scanDeps(root: string, options: { maxFiles?: number; maxFi
     if (stat.size > (options.maxFileBytes ?? 2 * 1024 * 1024)) { filesSkipped++; warn(rel + ' 超过文件大小上限'); return }
     filesScanned++
     try {
-      const text = await fs.readFile(absolute, { encoding: 'utf8', signal: options.signal }), file = rel || path.basename(absolute)
+      const text = (await boundedFile(absolute, options.maxFileBytes ?? 2 * 1024 * 1024, options.signal)).toString('utf8'), file = rel || path.basename(absolute)
       if (LOCKFILES.includes(path.basename(absolute))) { lockfiles.push(file); options.onDocument?.({ file, text }) }
       if (MANIFESTS.includes(path.basename(absolute))) parse(text, path.basename(absolute), file)
     }

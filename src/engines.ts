@@ -7,7 +7,7 @@ import { homedir, tmpdir } from 'node:os'
 import type { ResolvedSecureConfig, SourceEngine } from './config.js'
 import type { ProcessRunner } from './runner.js'
 import type { Finding } from './scanner.js'
-import { protectFinding, redactText } from './privacy.js'
+import { protectFinding, redactText, evidenceFingerprint } from './privacy.js'
 import { sanitizedHtmlLines } from './syntax.js'
 
 export type EngineId = SourceEngine | 'osv'
@@ -95,14 +95,17 @@ function normalizeFindings(engine: 'betterleaks' | 'semgrep', report: any, dir: 
       if (!sanitized.has(doc)) sanitized.set(doc, sanitizedHtmlLines(doc.text))
       if (sanitized.get(doc)!.has(line)) continue
     }
-    const snippet = lines.get(doc)!.slice(line - 1, endLine).join('\n').slice(0, 200)
+    const rawSnippet = lines.get(doc)!.slice(line - 1, endLine).join('\n')
+    const snippet = redactText(rawSnippet).slice(0, 200)
     const message = engine === 'betterleaks' ? row.Description : row.extra?.message
-    const title = engine === 'betterleaks' ? '检测到平台格式的密钥' : typeof message === 'string' ? message.slice(0, 200) : rule
+    const title = engine === 'betterleaks' ? '检测到平台格式的密钥' : typeof message === 'string' ? redactText(message).slice(0, 200) : rule
     const cwe = engine === 'betterleaks' ? 'CWE-798' : String(row.extra?.metadata?.cwe?.[0] ?? row.extra?.metadata?.cwe ?? 'CWE-20').match(/CWE-\d+/)?.[0] ?? 'CWE-20'
     const severity = engine === 'betterleaks' ? 'high' : row.extra?.severity === 'ERROR' ? 'high' : row.extra?.severity === 'INFO' ? 'low' : 'medium'
     const finding: Finding = { id: 'EXT-' + createHash('sha256').update(engine + '|' + rule + '|' + doc.file + '|' + line).digest('hex').slice(0, 12), ruleId: engine + ':' + rule, engine,
       title, cwe, severity, confidence: engine === 'betterleaks' ? row.Attributes?.confidence === 'low' ? 'low' : 'high' : row.extra?.metadata?.confidence === 'HIGH' ? 'high' : 'medium',
-      evidence: engine === 'semgrep' ? 'dataflow' : 'pattern', file: doc.file, line, endLine, snippet, message: typeof message === 'string' ? message.slice(0, 2000) : title }
+      evidence: engine === 'semgrep' ? 'dataflow' : 'pattern', file: doc.file, line, endLine, snippet,
+      fingerprint: evidenceFingerprint({ruleId: engine + ':' + rule, file: doc.file, snippet: rawSnippet.slice(0, 200)}),
+      message: typeof message === 'string' ? redactText(message).slice(0, 2000) : title }
     findings.push(protectFinding(finding))
   }
   return { findings, incomplete }
