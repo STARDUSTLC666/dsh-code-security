@@ -308,6 +308,7 @@ const SECURITY_WORKBENCH_CSS = `
 .security-workbench .security-project-inline {
   display: inline-flex;
   align-items: center;
+  flex: 0 1 auto;
   min-width: 110px;
   max-width: 170px;
 }
@@ -315,6 +316,61 @@ const SECURITY_WORKBENCH_CSS = `
 .security-workbench .security-project-menu {
   width: 100%;
   min-width: 110px;
+}
+
+@container dsh-workbench (max-width: 760px) {
+  .security-workbench .dsh-wb-header {
+    align-items: flex-start;
+    gap: 6px 12px;
+    padding-inline: 12px;
+  }
+
+  .security-workbench .dsh-wb-header > .dsh-header-leading {
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+  }
+
+  .security-workbench .dsh-wb-header-actions {
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    margin-inline-start: 0;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .security-workbench .security-project-inline {
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+  }
+
+  .security-workbench .security-project-menu {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .security-workbench .security-project-menu .dsh-wb-menu-btn {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .security-workbench .security-scan-action {
+    flex: 1 1 104px;
+    width: auto;
+    min-width: 104px;
+    max-width: 100%;
+    min-height: 36px;
+    white-space: normal;
+  }
 }
 
 .security-workbench .security-report-meta {
@@ -671,5 +727,12 @@ const SECURITY_WORKBENCH_CSS = `
 [role="dialog"]:has(.security-workbench) {
   width: min(1200px, calc(100dvw - 48px)) !important;
   max-width: 1200px !important;
+}
+
+@media (max-width: 620px) {
+  [role="dialog"]:has(.security-workbench) {
+    width: calc(100dvw - 20px) !important;
+    max-width: calc(100dvw - 20px) !important;
+  }
 }
 `;

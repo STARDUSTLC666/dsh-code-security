@@ -1,5 +1,12 @@
 # 更新记录
 
+## 0.9.7 (2026-11-21)
+
+- 修复窄工作台中项目选择器挤压操作按钮并将刷新/外观控件裁出可见区域的问题；扫描按钮在小窗口自动换行且保持可操作宽度。
+- 窄窗口中的安全工作台确认弹窗使用视口宽度布局，避免依赖项按钮与操作被边缘裁切。
+- Fix the security workbench header overflowing narrow host panels: project selection, scan actions and appearance controls now wrap into visible rows.
+- Size the unsaved-settings confirmation dialog to the narrow viewport so its actions remain visible.
+
 ## 0.9.6 (2026-11-20)
 
 - 升级共享更新组件至 0.2.10，移除跨插件右下角浮动提醒，保留工作台及插件详情页更新控制。
