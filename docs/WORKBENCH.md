@@ -1,8 +1,8 @@
 # dsh-code-security 工作台 / Workbench
 
-安全检查主工作台，问题、证据、覆盖与工具配置分开；切项目保护未保存设置，并通过原生会话打开文件。
+代码安全主工作台，默认「精密雷达态势仪（OP-SEC Hardware Instrument Cockpit）」暖陶瓷硬件机身 + OLED 态势屏 + 24 点可点击 LED 雷达矩阵 + 机械键帽控制行 + 代码显微检视舱（一键可切回经典「列表」双栏视图），集成 13 套风格 + 8 套字体、`? 引导` 分步导览、窄屏自适应顶栏，并保护未保存设置与通过原生会话打开文件。
 
-Security workbench with findings, evidence, coverage and tools; protects unsaved settings and opens files through native sessions.
+Security workbench featuring a default Braun/TE-inspired Hardware Instrument Cockpit (ceramic bezel, recessed dark-olive OLED posture display, interactive 24-dot LED scan matrix, mechanical filter/transport keycaps, and Code Microscope inspection bay, plus 1-click classic List split view), 13 themes + 8 fonts, interactive `? Tour`, narrow-panel header adaptation, unsaved-settings protection, and native session file opening.
 
 ## 使用 / Use
 

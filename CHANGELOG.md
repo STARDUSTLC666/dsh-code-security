@@ -1,5 +1,17 @@
 # 更新记录
 
+## 0.10.0 (2026-11-22)
+
+- **全新默认「精密雷达态势仪（OP-SEC Hardware Instrument Cockpit）」工作台视图**：
+  - `检查结果` 默认呈现 Braun / Teenage Engineering 灵感硬件仪器台：暖陶瓷机身（深色宿主自动柔和适配为阳极深板岩金属）、凹陷深橄榄 OLED 态势屏（左侧安全态势仪表盘、总数/新增计数、范围与规则遥测；右侧 **24 点可点击 LED 雷达矩阵**，点击任意亮灯立即定位下方代码显微舱）。
+  - 新增 3D 物理按压机械键帽控制行（`全部 / 严重 / 高 / 中 / 低 / 新增` 带 LED 指示灯筛选键、朱红 `▶ 检查代码`、`复查修复`、`◀ 上一条 / 下一条 ▶` 步进器）与 **代码显微检视舱**（`文件:行` 徽章、故障高亮代码切片、CWE 修复建议及机械操作键），顶部支持 **`仪器台 / 列表`** 一键切换回经典双栏视图。
+  - 修复 `1280×800` 中窄窗口下顶栏项目选择器与标签页挤压重叠问题，完整保留 `0.9.7` 窄屏与弹窗适配。
+  - 全面更新 5 步 `? 引导`（`CoachmarkTour`）、中英文使用流程文档、流程示意 SVG 与实机截图。
+- **New Default OP-SEC Hardware Instrument Cockpit View**:
+  - **Findings** now defaults to a Braun / Teenage Engineering inspired hardware cockpit: warm ceramic bezel (auto-adapting to anodized dark slate in dark mode), recessed dark-olive OLED telemetry display (Security Posture gauge, live scope & active rule telemetry, plus an interactive **24-dot LED Scan Matrix** where clicking any lit LED selects that finding immediately), 3D mechanical severity filter & transport keycaps (`▶ Scan code`, `Recheck fixes`, `◀ Prev / Next ▶`), and a **Code Microscope Inspection Bay** with fault-highlighted code slices, CWE remediation guidance, and 1-click actions — with a compact **`Cockpit / List`** toggle to return to classic split view anytime.
+  - Eliminated header tab / project-selector overlap at `1280×800` viewports while preserving `0.9.7` narrow-panel responsiveness.
+  - Updated the 5-step `? Tour`, Chinese/English usage flows, workflow SVGs, and README screenshots.
+
 ## 0.9.7 (2026-11-21)
 
 - 修复窄工作台中项目选择器挤压操作按钮并将刷新/外观控件裁出可见区域的问题；扫描按钮在小窗口自动换行且保持可操作宽度。

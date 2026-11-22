@@ -577,7 +577,7 @@ test('Unscanned project inline CTAs & interactive CoachmarkTour (? 引导, direc
 
   let tourDialog = env.findAll(wbTree, n => n.props?.role === 'dialog' && n.props?.['aria-modal'] === 'false')[0]
   assert.ok(tourDialog, 'CoachmarkTour auto-opens after 280ms on first visit')
-  assert.equal(tourDialog.props['data-tour-card'], 'scan')
+  assert.equal(tourDialog.props['data-tour-card'], 'oled-radar')
   const arrow = env.findAll(tourDialog, n => Object.hasOwn(n.props || {}, 'data-tour-arrow'))[0]
   assert.ok(arrow, 'CoachmarkTour renders directional [data-tour-arrow]')
 
@@ -588,8 +588,8 @@ test('Unscanned project inline CTAs & interactive CoachmarkTour (? 引导, direc
   await new Promise(r => setTimeout(r, 10))
   assert.deepEqual(copied, ['检查这个项目的安全问题，给出触发条件、文件位置和脱敏证据'])
 
-  // Progress through Steps 2 -> 3 -> 4 and complete tour
-  for (const expectedStepId of ['findings', 'dependencies', 'verify']) {
+  // Progress through Steps 2 -> 3 -> 4 -> 5 and complete tour
+  for (const expectedStepId of ['keycaps', 'microscope', 'dependencies', 'theme-font']) {
     const nextBtn = env.findAll(tourDialog, n => Object.hasOwn(n.props || {}, 'data-tour-next'))[0]
     nextBtn.props.onClick()
     wbTree = env.rerenderTree(() => env.React.createElement(Workbench, { workbench: true }))
@@ -728,8 +728,16 @@ test('UI v3 unified 48px header, sliding tabs, resizable split pane, shimmer ske
       onOpen: f => opened.push(f.id),
     }),
   )
+  // Switch to classic 列表 mode (persists to localStorage) and remount cleanly in mock React
+  const listToggle = env.findAll(resultsTree, n => n.type === 'button' && n.props?.['data-sec-view-toggle'] === 'list')[0]
+  assert.ok(listToggle, 'renders 列表 view toggle button')
+  listToggle.props.onClick()
+  assert.equal(env.storage.get('dsh-code-security:view-mode'), 'list')
+  env.resetState()
+  resultsTree = renderFindings()
+
   const resizer = env.findAll(resultsTree, n => n.props?.role === 'separator' && Object.hasOwn(n.props || {}, 'data-dsh-resizer'))[0]
-  assert.ok(resizer, 'renders DshSplitResizer separator')
+  assert.ok(resizer, 'renders DshSplitResizer separator in List mode')
   assert.equal(resizer.props['aria-valuenow'], 370)
   resizer.props.onKeyDown({ key: 'ArrowRight', preventDefault() {} })
   resultsTree = renderFindings()
@@ -786,5 +794,190 @@ test('CoachmarkTour measure() safely escapes React.useId() colon selectors witho
   )
   assert.deepEqual(queried, ['#:r22:-tabs-tab-findings', '[id=":r22:-tabs-tab-findings"]'])
   assert.ok(capturedLayout?.spotlight, 'resolves spotlight bounds via escaped [id="..."] selector')
+  env.cleanup()
+})
+
+test('Hardware Instrument Cockpit (仪器台) default view: ceramic bezel + OLED telemetry, 24-dot LED matrix click-to-select, mechanical keys, stepper & Code Microscope', async () => {
+  const copiedPrompts = []
+  const env = createMockEnv({ withHostPrimitives: false, onClipboardWrite: val => copiedPrompts.push(val) })
+  const { SecurityResults } = env.client.probe
+  const bundle = readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8')
+
+  // Verify bundled Braun/TE hardware ceramic + OLED + LED matrix + reduced-motion CSS
+  assert.match(bundle, /--sec-chassis-bg:\s*#efede8/)
+  assert.match(bundle, /--sec-oled-bg:\s*#171a18/)
+  assert.match(bundle, /--sec-oled-mint:\s*#86efac/)
+  assert.match(bundle, /--sec-oled-amber:\s*#fbbf24/)
+  assert.match(bundle, /--sec-oled-vermilion:\s*#f2542d/)
+  assert.match(bundle, /body\[data-ds-dark-theme\]\s*\[data-dsh-style="harness"\]\s*\.secw-cockpit-stage/)
+  assert.match(bundle, /@container dsh-workbench \(max-width:\s*1180px\)/)
+  assert.match(bundle, /grid-template-columns:\s*repeat\(6,\s*minmax\(0,\s*1fr\)\)/)
+
+  const sampleFindings = [
+    {
+      id: 'f-1',
+      ruleId: 'SEC-001',
+      cwe: 'CWE-95',
+      severity: 'critical',
+      confidence: 'high',
+      evidence: 'pattern',
+      file: 'src/eval.ts',
+      line: 14,
+      snippet: 'return eval(userExpr)\n// dynamic eval',
+      title: 'Dynamic code evaluation',
+      message: 'Avoid dynamic eval on untrusted expression.',
+    },
+    {
+      id: 'f-2',
+      ruleId: 'SEC-002',
+      cwe: 'CWE-78',
+      severity: 'high',
+      confidence: 'high',
+      evidence: 'dataflow',
+      file: 'src/shell.ts',
+      line: 42,
+      snippet: 'exec(`ls ${req.query.dir}`)',
+      title: 'Command injection',
+      message: 'Request input reaches shell command.',
+    },
+    {
+      id: 'f-3',
+      ruleId: 'SEC-201',
+      cwe: 'CWE-327',
+      severity: 'medium',
+      confidence: 'medium',
+      evidence: 'pattern',
+      file: 'src/hash.ts',
+      line: 9,
+      snippet: 'crypto.createHash("md5")',
+      title: 'Weak hash algorithm',
+      message: 'MD5 should not be used for integrity or passwords.',
+    },
+    {
+      id: 'f-4',
+      ruleId: 'SEC-501',
+      cwe: 'CWE-532',
+      severity: 'low',
+      confidence: 'low',
+      evidence: 'pattern',
+      file: 'src/log.ts',
+      line: 27,
+      snippet: 'console.log(debugHeaders)',
+      title: 'Verbose debug log',
+      message: 'Review whether sensitive headers can be logged.',
+    },
+  ]
+
+  const runCalls = []
+  const downloadCalls = []
+  const copyCalls = []
+  const openCalls = []
+  let activeFilter = 'all'
+
+  const filterList = f => {
+    if (f === 'new') return sampleFindings.filter(x => x.id === 'f-1' || x.id === 'f-2')
+    if (['critical', 'high', 'medium', 'low'].includes(f)) return sampleFindings.filter(x => x.severity === f)
+    return sampleFindings
+  }
+
+  const renderCockpit = () =>
+    env.renderTree(() =>
+      env.React.createElement(SecurityResults, {
+        report: {
+          hasScan: true,
+          passed: false,
+          complete: true,
+          time: '2026-11-22T03:00:00Z',
+          scope: { kind: 'scan', target: 'workspace' },
+          newCounts: { critical: 1, high: 1 },
+          acceptedCounts: { medium: 1, low: 1 },
+          findings: sampleFindings,
+          coverage: [{ engine: 'builtin', status: 'completed' }],
+        },
+        findings: filterList(activeFilter),
+        fresh: new Set(['f-1', 'f-2']),
+        filter: activeFilter,
+        setFilter: next => { activeFilter = next },
+        limit: 50,
+        setLimit() {},
+        busy: false,
+        loading: false,
+        onRun: name => runCalls.push(name),
+        download: fmt => downloadCalls.push(fmt),
+        onCopy: item => copyCalls.push(item.id),
+        onOpen: item => openCalls.push(item.id),
+        copiedId: '',
+      }),
+    )
+
+  let tree = renderCockpit()
+
+  // 1) Default landing view is 仪器台 (Cockpit), NOT classic 2-column split table
+  assert.ok(env.findAll(tree, n => n.props?.['data-sec-view'] === 'cockpit')[0], 'defaults to Hardware Instrument Cockpit view')
+  assert.equal(env.findAll(tree, n => n.props?.role === 'separator' && Object.hasOwn(n.props || {}, 'data-dsh-resizer')).length, 0, 'no split resizer in default Cockpit mode')
+  const cockpitBtn = env.findAll(tree, n => n.type === 'button' && n.props?.['data-sec-view-toggle'] === 'cockpit')[0]
+  assert.equal(cockpitBtn.props['aria-pressed'], true)
+
+  // 2) OLED telemetry & 24-dot LED scan matrix (4 lit finding slots + 20 healthy standby emerald slots = 24 total)
+  const allLedSlots = env.findAll(tree, n => n.props?.['data-sec-led-slot'] !== undefined)
+  assert.equal(allLedSlots.length, 24, 'renders exact 24-dot LED scan matrix')
+  const litDots = env.findAll(tree, n => n.type === 'button' && n.props?.['data-sec-finding-id'])
+  const healthyDots = env.findAll(tree, n => n.props?.['data-state'] === 'healthy')
+  assert.equal(litDots.length, 4)
+  assert.equal(healthyDots.length, 20)
+
+  const oledRule = env.findAll(tree, n => Object.hasOwn(n.props || {}, 'data-sec-oled-rule'))[0]
+  assert.match(String(oledRule.children[0]), /SEC-001 · CWE-95/)
+
+  // 3) Click LED dot for f-2 and confirm immediate selection in Code Microscope below
+  const dot2 = env.findAll(tree, n => n.type === 'button' && n.props?.['data-sec-finding-id'] === 'f-2')[0]
+  dot2.props.onClick()
+  tree = renderCockpit()
+  const activeDot2 = env.findAll(tree, n => n.type === 'button' && n.props?.['data-sec-finding-id'] === 'f-2')[0]
+  assert.equal(activeDot2.props['data-active'], 'true')
+  const locBadge = env.findAll(tree, n => Object.hasOwn(n.props || {}, 'data-sec-microscope-loc'))[0]
+  const locCode = env.findAll(locBadge, n => n.type === 'code')[0]
+  assert.equal(locCode.children[0], 'src/shell.ts:42')
+
+  // 4) Hardware stepper keys 下一条 ▶ / ◀ 上一条 cycle findings
+  const nextStep = env.findAll(tree, n => n.type === 'button' && n.props?.['data-sec-stepper'] === 'next')[0]
+  nextStep.props.onClick()
+  tree = renderCockpit()
+  assert.equal(env.findAll(env.findAll(tree, n => Object.hasOwn(n.props || {}, 'data-sec-microscope-loc'))[0], n => n.type === 'code')[0].children[0], 'src/hash.ts:9')
+
+  const prevStep = env.findAll(tree, n => n.type === 'button' && n.props?.['data-sec-stepper'] === 'prev')[0]
+  prevStep.props.onClick()
+  tree = renderCockpit()
+  assert.equal(env.findAll(env.findAll(tree, n => Object.hasOwn(n.props || {}, 'data-sec-microscope-loc'))[0], n => n.type === 'code')[0].children[0], 'src/shell.ts:42')
+
+  // 5) Mechanical keycap control row: all 6 filter keys + ▶ 检查代码 + 复查修复
+  for (const keyId of ['all', 'critical', 'high', 'medium', 'low', 'new']) {
+    const keyBtn = env.findAll(tree, n => n.type === 'button' && n.props?.['data-sec-filter-key'] === keyId)[0]
+    assert.ok(keyBtn, `renders mechanical filter keycap: ${keyId}`)
+  }
+  env.findAll(tree, n => n.type === 'button' && n.props?.['data-sec-filter-key'] === 'medium')[0].props.onClick()
+  assert.equal(activeFilter, 'medium')
+  tree = renderCockpit()
+  assert.equal(env.findAll(tree, n => n.type === 'button' && n.props?.['data-sec-finding-id']).length, 1)
+
+  env.findAll(tree, n => n.type === 'button' && n.props?.['data-sec-cockpit-action'] === 'scan')[0].props.onClick()
+  env.findAll(tree, n => n.type === 'button' && n.props?.['data-sec-cockpit-action'] === 'verify')[0].props.onClick()
+  assert.deepEqual(runCalls, ['scan', 'verify'])
+
+  // 6) Code Microscope mechanical action keys: copy, open, fix prompt, SARIF, Markdown
+  env.findAll(tree, n => n.type === 'button' && n.props?.['data-sec-microscope-action'] === 'copy')[0].props.onClick()
+  env.findAll(tree, n => n.type === 'button' && n.props?.['data-sec-microscope-action'] === 'open')[0].props.onClick()
+  env.findAll(tree, n => n.type === 'button' && n.props?.['data-sec-microscope-action'] === 'sarif')[0].props.onClick()
+  env.findAll(tree, n => n.type === 'button' && n.props?.['data-sec-microscope-action'] === 'markdown')[0].props.onClick()
+  const fixPromptBtn = env.findAll(tree, n => n.type === 'button' && n.props?.['data-copy-prompt'])[0]
+  assert.ok(fixPromptBtn, 'renders 复制修复指令 prompt button inside Code Microscope')
+  fixPromptBtn.props.onClick()
+  await new Promise(r => setTimeout(r, 10))
+
+  assert.deepEqual(copyCalls, ['f-3'])
+  assert.deepEqual(openCalls, ['f-3'])
+  assert.deepEqual(downloadCalls, ['sarif', 'markdown'])
+  assert.match(copiedPrompts[0], /src\/hash\.ts:9/)
+
   env.cleanup()
 })

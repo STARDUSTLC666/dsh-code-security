@@ -14,7 +14,13 @@ Ask in a project chat: “Check the current changes for security issues, show ev
 
 Projects come from host sessions or completed security tools; the browser cannot submit arbitrary filesystem roots. If a project is missing, run a check in its chat and refresh the list. Jobs continue when the panel is closed. Cancellation waits for the scanner and preserves the previous report.
 
-Findings show severity, confidence, rule, location, source engines and redacted evidence. Filter new/high-risk findings, copy locations, download SARIF/Markdown, or open a file while its corresponding project chat is active.
+**Findings** defaults to the **Hardware Instrument Cockpit (`Cockpit`)** view, with a 1-click **`Cockpit / List`** toggle to return to the classic split list anytime:
+
+- **OLED Telemetry Screen & 24-Dot LED Scan Matrix**: The left OLED bay displays the Security Posture gauge, total/new counts, active scope, and selected rule telemetry; the right 24-dot LED matrix lights up each hit by severity (crimson/vermilion for critical/high, amber for medium, sky for low, soft emerald for healthy slots) — click any lit LED to inspect it immediately below.
+- **Mechanical Keycap Row**: 3D physical-press filter keys (`All / Crit / High / Med / Low / New`), signature vermilion **▶ Scan code**, **Recheck fixes**, and `◀ Prev / Next ▶` stepper controls.
+- **Code Microscope Inspection Bay**: Shows the `file:line` badge, a fault-highlighted redacted code slice, trigger explanation, CWE remediation guidance, and raised action keys for Copy location, Open file (when the project chat is active), Copy fix prompt, and SARIF / Markdown downloads.
+
+Use **? Tour** in the header for a guided walkthrough, and switch between 13 synced styles (auto-adapting to anodized dark slate in dark mode) and 8 font pairings (`YouYuan Mono` default).
 
 The report header shows the saved scan time, scope and mode. Updating the plugin does not rerun old reports. “New” means a finding is absent from the accepted baseline, not that a vulnerability just appeared.
 

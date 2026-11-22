@@ -81,6 +81,21 @@ let securityHostContext;
         }
         function Workbench({ workbench = false } = {}) {
             const [activeTab, setActiveTab] = useState('findings'), [switchTo, setSwitchTo] = useState(''), [copiedId, setCopiedId] = useState('');
+            const [resultsViewMode, setResultsViewModeState] = useState(() => {
+                try {
+                    const saved = typeof window !== 'undefined' ? window.localStorage?.getItem('dsh-code-security:view-mode') : null;
+                    return saved === 'list' ? 'list' : 'cockpit';
+                } catch {
+                    return 'cockpit';
+                }
+            });
+            function setResultsViewMode(next) {
+                const mode = next === 'list' ? 'list' : 'cockpit';
+                setResultsViewModeState(mode);
+                try {
+                    if (typeof window !== 'undefined') window.localStorage?.setItem('dsh-code-security:view-mode', mode);
+                } catch { }
+            }
             const controlId = typeof React.useId === 'function' ? React.useId() : 'secw-ctl';
             const [, repaint] = useState(0), [catalog, setCatalog] = useState([]), [id, setId] = useState(''), [data, setData] = useState(null), [settings, setSettings] = useState({ engines: ['builtin'], enginePaths: {} }), [autoCheck, setAutoCheck] = useState(false), [dirty, setDirty] = useState(false), [job, setJob] = useState(null), [result, setResult] = useState(null), [error, setError] = useState(''), [notice, setNotice] = useState(''), [loading, setLoading] = useState(true), [pendingId, setPendingId] = useState(''), [mode, setMode] = useState('none'), [filter, setFilter] = useState('all'), [limit, setLimit] = useState(50);
             const generation = useRef(0), mounted = useRef(true), requests = useRef(new Set()), copyTimer = useRef(null);
@@ -164,7 +179,13 @@ let securityHostContext;
             const fresh = useMemo(() => new Set((report?.newFindings || []).map(f => f.id)), [report?.newFindings]);
             const findings = useMemo(() => {
                 const list = report?.findings || [];
-                return filter === 'new' ? list.filter(f => fresh.has(f.id)) : filter === 'high' ? list.filter(f => ['critical', 'high'].includes(f.severity)) : list;
+                if (filter === 'new') return list.filter(f => fresh.has(f.id));
+                if (filter === 'critical') return list.filter(f => f.severity === 'critical');
+                if (filter === 'high') return list.filter(f => f.severity === 'high');
+                if (filter === 'medium') return list.filter(f => f.severity === 'medium');
+                if (filter === 'low') return list.filter(f => f.severity === 'low');
+                if (filter === 'high-risk') return list.filter(f => ['critical', 'high'].includes(f.severity));
+                return list;
             }, [report?.findings, fresh, filter]);
             async function run(name) {
                 setError(''); setNotice(''); setResult(null);
@@ -266,14 +287,14 @@ let securityHostContext;
             ];
             const securityTourSteps = [
                 {
-                    id: 'scan',
-                    selector: '[data-tour="sec-scan"]',
-                    fallback: '[data-tour="sec-project"], [data-sec-empty-action="scan"], [data-copy-prompt]',
+                    id: 'oled-radar',
+                    selector: '[data-tour="sec-oled-radar"]',
+                    fallback: '[data-tour="sec-scan"], [data-sec-empty-action="scan"], [data-copy-prompt]',
                     side: 'bottom',
-                    title: t('选择项目与一键安全扫描', 'Select project & run a security check'),
+                    title: t('仪器台 / 列表切换与 24-LED 雷达态势屏', 'Cockpit / List toggle & 24-LED OLED radar'),
                     desc: t(
-                        '切换已收录的工作区后，点「检查代码」扫描全仓或点「检查改动」快速审查 Git 新增代码；首次使用可直接复制下方指令发到项目聊天。',
-                        'Pick a workspace and click Scan code or Check changes for Git diffs — or copy the prompt below into a project chat to start.',
+                        '默认进入 Braun/TE 硬件仪器台：左侧 OLED 显示安全态势分、范围与规则遥测，右侧 24 点 LED 雷达矩阵按严重度点亮——点击任意亮灯立即定位该问题；也可一键切回经典「列表」视图。',
+                        'Default hardware cockpit: left OLED tracks posture, scope & active rule telemetry; right 24-dot LED matrix lights up by severity—click any lit dot to inspect it, or switch to List view anytime.',
                     ),
                     ...(!report?.hasScan
                         ? {
@@ -286,14 +307,25 @@ let securityHostContext;
                         : {}),
                 },
                 {
-                    id: 'findings',
-                    selector: '#' + secTabsId + '-tab-findings',
-                    fallback: '.secw-filter-menu',
+                    id: 'keycaps',
+                    selector: '[data-tour="sec-keycaps"]',
+                    fallback: '[data-tour="sec-scan"], [data-tour="sec-project"]',
                     side: 'bottom',
-                    title: t('核对触发条件与脱敏代码证据', 'Inspect triggers & redacted evidence'),
+                    title: t('机械筛选键、▶ 检查代码与复查闭环', 'Mechanical filter keys, ▶ Scan & Recheck'),
                     desc: t(
-                        '在「检查结果」按新增或高风险筛选，核对文件行号、数据流/模式说明与脱敏代码片段，并可一键复制修复指令发回聊天。',
-                        'Filter by New or High risk in Findings, inspect file lines and redacted snippets, and copy a 1-click fix prompt into chat.',
+                        '用「全部 / 严重 / 高 / 中 / 低 / 新增」3D 机械键实时过滤通道，点朱红「▶ 检查代码」发起本地扫描、用「◀ 上一条 / 下一条 ▶」步进检视，修完后点「复查修复」闭环确认。',
+                        'Filter channels with 3D mechanical keys (All/Crit/High/Med/Low/New), trigger scans with vermilion ▶ Scan code, step through hits, and close the loop with Recheck fixes.',
+                    ),
+                },
+                {
+                    id: 'microscope',
+                    selector: '[data-tour="sec-microscope"]',
+                    fallback: '#' + secTabsId + '-tab-findings',
+                    side: 'top',
+                    title: t('代码显微检视舱与修复指令导出', 'Code Microscope evidence & fix actions'),
+                    desc: t(
+                        'OLED 下方显微舱展示文件行号、故障高亮代码切片、触发说明与 CWE 修复建议，并支持一键复制位置、打开文件、复制修复指令或下载 SARIF / Markdown。',
+                        'Inspect file:line badges, fault-highlighted code slices, CWE remediation guidance, and 1-click Copy location, Open file, Copy fix prompt, or SARIF/Markdown exports.',
                     ),
                 },
                 {
@@ -301,21 +333,21 @@ let securityHostContext;
                     selector: '#' + secTabsId + '-tab-dependencies',
                     fallback: '[data-tour="sec-scan"]',
                     side: 'bottom',
-                    title: t('依赖漏洞离线/联网核查', 'Offline & online dependency audits'),
+                    title: t('依赖清单与离线 / 联网 OSV 漏洞核查', 'Dependency inventory & OSV audits'),
                     desc: t(
-                        '在「依赖检查」盘点锁文件依赖，按需切换本地离线数据库或联网查询 OSV 已知漏洞（不上传项目源码）。',
-                        'Inventory lockfile packages in Dependencies and audit against a local database or online OSV (source code is never uploaded).',
+                        '在「依赖检查」盘点锁文件依赖，按需切换本地离线漏洞库或联网查询 OSV（不上传项目源码），也可在「工具与设置」接入 Betterleaks / Semgrep CE。',
+                        'Inventory lockfile packages in Dependencies and audit against a local database or online OSV without uploading source code, or configure optional engines in Tools and settings.',
                     ),
                 },
                 {
-                    id: 'verify',
-                    selector: '[data-tour="sec-verify"]',
-                    fallback: '#' + secTabsId + '-tab-settings',
+                    id: 'theme-font',
+                    selector: '.dsh-style-switcher',
+                    fallback: '[data-dsh-header]',
                     side: 'bottom',
-                    title: t('修复后点击「复查修复」闭环验证', 'Click “Recheck fixes” to close the loop'),
+                    title: t('13 套工作台风格与 8 套字体搭配', '13 workbench styles & 8 font pairings'),
                     desc: t(
-                        '助手修完问题后，点「复查修复」对同一范围重验问题是否关闭且无新增，也可在「工具与设置」接入可选增强引擎。',
-                        'After patching, click Recheck fixes on the same scope to confirm closure, or configure optional engines in Tools and settings.',
+                        '右上角可自由切换 13 套工作台风格（深色宿主自动柔和适配为深板岩阳极金属机身）与 8 套中英文字体搭配，跨插件实时同步。',
+                        'Switch between 13 bright styles (auto-adapting to anodized dark slate in dark mode) and 8 font pairings synced across plugins.',
                     ),
                 },
             ];
@@ -500,7 +532,7 @@ let securityHostContext;
                                     h('p', null, v.summary),
                                     h('p', { className: 'secw-muted' }, t('修复版本：', 'Fixed versions: ') + (v.fixedVersions?.join(', ') || t('暂无', 'Not available'))),
                                     h(ExternalLink, { href: v.url }, v.id)))) : null) : null)
-                    : h(SecurityResults, { report, findings, fresh, filter, setFilter, limit, setLimit, busy, loading, disabled, onRun: run, download, copiedId, onOpen: f => location(f, false), onCopy: f => location(f, true) })),
+                    : h(SecurityResults, { report, findings, fresh, filter, setFilter, limit, setLimit, viewMode: resultsViewMode, setViewMode: setResultsViewMode, busy, loading, disabled, onRun: run, download, copiedId, onOpen: f => location(f, false), onCopy: f => location(f, true) })),
                 updateControls,
                 switchTo ? h(W.Dialog, {
                     title: t('设置尚未保存', 'Unsaved settings'),
