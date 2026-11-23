@@ -175,6 +175,7 @@ function createMockEnv({ withHostPrimitives = false, storageThrows = false, init
   )
 
   runInNewContext(instrumented, {
+    URL,
     window: mockWindow,
     document: mockDocument,
     CustomEvent: MockCustomEvent,
@@ -979,5 +980,26 @@ test('Hardware Instrument Cockpit (仪器台) default view: ceramic bezel + OLED
   assert.deepEqual(downloadCalls, ['sarif', 'markdown'])
   assert.match(copiedPrompts[0], /src\/hash\.ts:9/)
 
+  env.cleanup()
+})
+
+test('client uses document.baseURI URL resolution and W.writeClipboardText fallback for location copy', async () => {
+  const bundle = readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8')
+  assert.match(bundle, /new URL\('api\/dsh-code-security\/workbench', document\.baseURI\)/)
+  assert.match(bundle, /W\.writeClipboardText\(value\.path \+ ':' \+ value\.line\)/)
+  assert.doesNotMatch(bundle, /navigator\.clipboard\.writeText\(value\.path/)
+
+  let fallbackText = ''
+  const env = createMockEnv({
+    withHostPrimitives: false,
+    onClipboardWrite: () => { throw new Error('clipboard denied') },
+  })
+  const origDoc = env.mockDocument
+  origDoc.body = { append(node) { fallbackText = node.value } }
+  origDoc.createElement = () => ({ value: '', style: {}, setAttribute() {}, select() {}, remove() {} })
+  origDoc.execCommand = cmd => cmd === 'copy'
+  const ok = await env.client.probe.W.writeClipboardText('/repo/src/app.ts:12')
+  assert.equal(ok, true)
+  assert.equal(fallbackText, '/repo/src/app.ts:12')
   env.cleanup()
 })

@@ -89,6 +89,27 @@ Rechecks retain the previous target, Git base, staging mode and engine selection
 
 Legacy diff records lack the full scope metadata. Rerun secure_diff once after upgrading before rechecking such a record.
 
+## Plugin configuration (`cordis.patch.yml`)
+
+Override any of the 8 plugin-level configuration keys under the `code-security` row in your profile's `cordis.patch.yml` (all keys are optional):
+
+```yaml
+- id: code-security
+  name: 'dsh-code-security'
+  config:
+    engines: ['builtin']          # active engines: builtin / betterleaks / semgrep
+    # enginePaths:                # optional executable paths for external scanners
+    #   betterleaks: '/path/to/betterleaks'
+    #   semgrep: '/path/to/semgrep'
+    #   osv: '/path/to/osv-scanner'
+    engineTimeoutMs: 60000        # external engine timeout in ms (1000–180000, default 60000)
+    # osvDatabaseDir: ''          # optional local OSV offline vulnerability cache directory
+    maxFiles: 5000                # full-scan file cap (10–100000, default 5000)
+    maxFileBytes: 2097152         # per-file size cap in bytes (65536–20971520, default 2 MiB)
+    failOn: medium                # severity gate threshold: critical / high / medium / low (default medium)
+    stateDir: .code-security      # state directory (relative paths resolve per session workspace)
+```
+
 ## Scope and state
 
 Defaults: 5,000 files, 2 MiB per file, at most 64 MiB per enhanced snapshot. Build directories, node_modules, .git and .code-security are excluded; symlinks/junctions are not followed. Unreadable/oversized files and parse/output limits are explicitly incomplete. Current scans cover a workspace or Git diff, not every historical commit.
@@ -101,7 +122,7 @@ Policy file: `.code-security.json`.
 {"version":1,"exclude":["vendor/**","generated/**"],"ignore":[{"ruleId":"SEC-206","file":"test/**","reason":"Not security-sensitive"}],"failOn":"high"}
 ```
 
-Git runs with external diff/textconv disabled, and the reviewed repository's own executable config is neutralised too: every git call passes `-c core.fsmonitor=false`, and diff runs with `--attr-source=<empty tree>` so the worktree `.gitattributes` no longer applies (a `filter.<driver>.clean` is neither executed nor able to rewrite the diff). `--attr-source` needs Git 2.40+; older versions fall back to disabling fsmonitor only. Paths are relative to the session workspace. Staged scans read the index and only added-line findings are reported. Invalid arguments, Git refs and incomplete hunks preserve previous state.
+Git runs with external diff/textconv disabled, and the reviewed repository's own executable config is neutralised too: every git call passes `-c core.fsmonitor=false`, and diff runs with `--attr-source=<empty tree>` so the worktree `.gitattributes` no longer applies (a `filter.<driver>.clean` is neither executed nor able to rewrite the diff). `--attr-source` needs Git 2.40+; on older or incompatible Git versions, diff scanning fails closed and reports incomplete instead of falling back to an unhardened diff (upgrade Git or use the full-file scan). Paths are relative to the session workspace. Staged scans read the index and only added-line findings are reported. Invalid arguments, Git refs and incomplete hunks preserve previous state.
 
 ## Troubleshooting
 

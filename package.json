@@ -1,6 +1,6 @@
 {
   "name": "dsh-code-security",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "DeepSeek Harness 代码安全工作台：默认 OP-SEC 精密雷达态势仪（暖陶瓷硬件机身 + OLED 态势屏 + 可点击 24-LED 雷达矩阵 + 3D 机械筛选键 + 代码显微检视舱，支持一键切回经典列表）、本地静态扫描、Git 改动审查、依赖审计与修复复核，内置 13 套明亮风格与 8 套字体搭配。",
   "type": "module",
   "main": "lib/index.js",

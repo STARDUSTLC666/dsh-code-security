@@ -4,10 +4,17 @@
 #   - id: code-security
 #     name: 'dsh-code-security'
 #     config:
-#       maxFiles: 5000
-#       maxFileBytes: 2097152
-#       failOn: medium
-#       stateDir: .code-security
+#       engines: ['builtin']            # 可选：builtin / betterleaks / semgrep
+#       enginePaths:                    # 可选：自定义外部引擎可执行文件路径
+#         betterleaks: ''
+#         semgrep: ''
+#         osv: ''
+#       engineTimeoutMs: 60000          # 外部引擎单次超时（1000-180000 毫秒）
+#       osvDatabaseDir: ''              # 可选：OSV 本地离线漏洞库缓存目录
+#       maxFiles: 5000                  # 单次全量扫描最多文件数（10-100000）
+#       maxFileBytes: 2097152           # 单文件体积上限（65536-20971520 字节）
+#       failOn: medium                  # 门禁严重度阈值：critical / high / medium / low
+#       stateDir: .code-security        # 状态目录（相对路径按当前会话工作区解析）
 #
 - insert:
     - id: code-security

@@ -87,6 +87,27 @@ OSV 2.7.0 当前实现使用 `缓存目录/osv-scalibr/npm/all.zip`（Python 使
 
 升级前的增量记录未保存完整范围，需先重新执行 secure_diff，之后才能按原范围复查。
 
+## 插件配置（`cordis.patch.yml`）
+
+可在当前 profile 的 `cordis.patch.yml` 中配置以下 8 项插件级参数（缺省全部使用默认值）：
+
+```yaml
+- id: code-security
+  name: 'dsh-code-security'
+  config:
+    engines: ['builtin']          # 默认启用的检查引擎：builtin / betterleaks / semgrep
+    # enginePaths:                # 可选：外部引擎可执行文件路径映射
+    #   betterleaks: '/path/to/betterleaks'
+    #   semgrep: '/path/to/semgrep'
+    #   osv: '/path/to/osv-scanner'
+    engineTimeoutMs: 60000        # 外部引擎超时（毫秒，范围 1000–180000，默认 60000）
+    # osvDatabaseDir: ''          # 可选：OSV 本地离线漏洞库缓存目录
+    maxFiles: 5000                # 全量扫描文件数上限（10–100000，默认 5000）
+    maxFileBytes: 2097152         # 单文件字节上限（65536–20971520，默认 2 MiB）
+    failOn: medium                # 严重度门禁阈值：critical / high / medium / low（默认 medium）
+    stateDir: .code-security      # 扫描状态目录（默认相对当前会话工作区解析）
+```
+
 ## 范围、策略和记录
 
 默认跳过 node_modules、.git、构建目录和 .code-security，也不跟随符号链接/目录联接。默认文件上限 5000、每文件 2 MiB；增强快照总量最多 64 MiB。超过限制、无法读取或格式无效时明确显示不完整。当前检查工作区或指定 Git 差异，不遍历所有 Git 历史提交。
@@ -104,7 +125,7 @@ OSV 2.7.0 当前实现使用 `缓存目录/osv-scalibr/npm/all.zip`（Python 使
 }
 ```
 
-Git 输出禁用外部 diff/textconv，并额外关掉被扫仓库自带的可执行配置：所有 git 调用都带 `-c core.fsmonitor=false`，diff 还用 `--attr-source=<空树>` 让 `.gitattributes` 不生效（`filter.<驱动>.clean` 既不执行、也无法改写 diff 内容）。`--attr-source` 需要 Git 2.40+，更老的版本会退回只关闭 fsmonitor 的调用。路径相对当前会话工作区。暂存检查读取 Git index；新增行才计入差异发现。错写参数、无效 Git ref 或不完整 diff 不会覆盖已有记录。
+Git 输出禁用外部 diff/textconv，并额外关掉被扫仓库自带的可执行配置：所有 git 调用都带 `-c core.fsmonitor=false`，diff 还用 `--attr-source=<空树>` 让 `.gitattributes` 不生效（`filter.<驱动>.clean` 既不执行、也无法改写 diff 内容）。`--attr-source` 需要 Git 2.40+；若当前 Git 不支持该选项，插件会直接中止并返回未完成，绝不退回未加固的 diff 调用（请升级 Git 或改用全文件扫描）。路径相对当前会话工作区。暂存检查读取 Git index；新增行才计入差异发现。错写参数、无效 Git ref 或不完整 diff 不会覆盖已有记录。
 
 ## 排错
 

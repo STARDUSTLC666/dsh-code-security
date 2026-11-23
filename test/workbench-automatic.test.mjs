@@ -24,6 +24,11 @@ test('workbench rejects browser-supplied paths, cross-site calls, malformed sett
   await assert.rejects(wb.action({ ...settings(row, false), engines: [] }))
   const headers = { 'content-type': 'application/json', 'x-dsh-security-action': '1' }
   assert.equal((await wb.fetch(new Request('http://connection.internal/api', { method: 'POST', headers: { ...headers, host: 'localhost:123', origin: 'http://localhost:123', 'sec-fetch-site': 'same-origin' }, body: '{"operation":"list"}' }))).status, 200)
+  assert.equal((await wb.fetch(new Request('http://connection.internal/api', { method: 'POST', headers: { ...headers, origin: 'dsh-app://app' }, body: '{"operation":"list"}' }))).status, 200)
+  assert.equal((await wb.fetch(new Request('http://connection.internal/api', { method: 'POST', headers: { ...headers, origin: 'dsh-app://app', 'sec-fetch-site': 'cross-site' }, body: '{"operation":"list"}' }))).status, 200)
+  assert.equal((await wb.fetch(new Request('http://connection.internal/api', { method: 'POST', headers: { 'content-type': 'application/json', origin: 'dsh-app://app', 'sec-fetch-site': 'cross-site' }, body: '{"operation":"list"}' }))).status, 403)
+  assert.equal((await wb.fetch(new Request('http://connection.internal/api', { method: 'POST', headers: { ...headers, origin: 'dsh-app://evil', 'sec-fetch-site': 'cross-site' }, body: '{"operation":"list"}' }))).status, 403)
+  assert.equal((await wb.fetch(new Request('http://connection.internal/api', { method: 'POST', headers: { ...headers, origin: 'null' }, body: '{"operation":"list"}' }))).status, 403)
   assert.equal((await wb.fetch(new Request('http://localhost:123/api', { method: 'POST', headers: { ...headers, origin: 'https://localhost:123' }, body: '{}' }))).status, 403)
   assert.equal((await wb.fetch(new Request('http://localhost:123/api', { method: 'POST', headers: { ...headers, 'sec-fetch-site': 'cross-site' }, body: '{}' }))).status, 403)
   assert.equal((await wb.fetch(new Request('http://localhost:123/api', { method: 'POST', headers, body: 'x'.repeat(16385) }))).status, 413)

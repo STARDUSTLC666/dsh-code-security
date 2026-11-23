@@ -23,7 +23,7 @@ let securityHostContext;
         const names = { get builtin(){return t('内置规则','Built-in rules')}, betterleaks: 'Betterleaks', semgrep: 'Semgrep CE', osv: 'OSV-Scanner' };
         const risk = value => ({ critical: t('严重', 'Critical'), high: t('高', 'High'), medium: t('中', 'Medium'), low: t('低', 'Low') }[value] || value);
         const links = { betterleaks: 'https://github.com/betterleaks/betterleaks/releases/tag/v1.9.0', osv: 'https://github.com/google/osv-scanner/releases/tag/v2.7.0', semgrep: 'https://docs.semgrep.dev/getting-started/quickstart-ce' };
-        async function action(body, signal) { const response = await fetch('api/dsh-code-security/workbench', { method: 'POST', credentials: 'same-origin', cache: 'no-store', signal, headers: { 'content-type': 'application/json', 'x-dsh-security-action': '1' }, body: JSON.stringify(body) }); let value; try {
+        async function action(body, signal) { const response = await fetch(new URL('api/dsh-code-security/workbench', document.baseURI), { method: 'POST', credentials: 'same-origin', cache: 'no-store', signal, headers: { 'content-type': 'application/json', 'x-dsh-security-action': '1' }, body: JSON.stringify(body) }); let value; try {
             value = await response.json();
         }
         catch {
@@ -237,7 +237,8 @@ let securityHostContext;
                 try {
                     const value = await request({ operation: 'location', id, finding: finding.id });
                     if (copy) {
-                        await navigator.clipboard.writeText(value.path + ':' + value.line);
+                        const copiedOk = await W.writeClipboardText(value.path + ':' + value.line);
+                        if (!copiedOk) throw new Error(t('无法访问剪贴板，请手动复制文件位置。', 'Clipboard access is unavailable. Copy the file location manually.'));
                         setCopiedId(finding.id);
                         clearTimeout(copyTimer.current);
                         copyTimer.current = setTimeout(() => { if (mounted.current) setCopiedId(''); }, 1600);

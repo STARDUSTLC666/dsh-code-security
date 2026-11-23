@@ -1,5 +1,12 @@
 # 更新记录
 
+## 0.10.1 (2026-11-23)
+
+- 修复桌面端工作台来源校验：放行精确的 DSH Desktop 来源 `Origin: dsh-app://app`（含 `Sec-Fetch-Site` 豁免），同时继续要求专用请求头与 JSON 格式，并对跨源/无效来源返回 HTTP 403。
+- 统一工作台前端请求路径构造（`new URL(..., document.baseURI)`）与位置复制剪贴板降级（`W.writeClipboardText`）；修正旧 Git `--attr-source` 失败关闭说明矛盾，并在文档与 `cordis.patch.yml` 完整列出全部 8 项插件配置键，同步更新参考与工作台文档。
+- Fix DSH Desktop workbench compatibility by exempting exact `Origin: dsh-app://app` (both `Origin` and `Sec-Fetch-Site`) while keeping action-header/JSON checks and returning HTTP 403 for cross-origin or malformed origins.
+- Standardize frontend fetch URL resolution via `new URL(..., document.baseURI)` and clipboard copy fallback via `W.writeClipboardText`; align `--attr-source` docs with fail-closed behavior, document all 8 `cordis.patch.yml` config keys, and update reference/workbench docs.
+
 ## 0.10.0 (2026-11-22)
 
 - **全新默认「精密雷达态势仪（OP-SEC Hardware Instrument Cockpit）」工作台视图**：
