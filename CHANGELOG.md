@@ -1,5 +1,12 @@
 # 更新记录
 
+## 0.10.2 (2026-11-24)
+
+- 工作台顶栏新增 **「移出项目列表」** 入口与确认弹窗（`remove-workspace`），可从 `workspaces.json` 移除工作区记录、中止进行中扫描并关闭自动检查，绝不删除磁盘上的源代码文件。
+- 外部删除或移动工作区目录后，列表刷新、窗口切回（`focus` / `visibilitychange`）及 8 秒静默同步会自动隐藏失效目录并切到存活工作区；未扫到前点击返回结构化 `404 workspace_missing` 并自动清理，未扫到前手动移出亦可直接成功。
+- Add a header **Remove from project list** action (`remove-workspace`) with confirmation dialog that removes the workbench catalog entry, stops active jobs, and disables auto-checks without deleting local source files.
+- Auto-hide deleted or moved workspace folders on list refresh, window focus/visibility return, and lightweight 8s sync, returning structured `404 workspace_missing` on stale open and cleanly switching to remaining live workspaces.
+
 ## 0.10.1 (2026-11-23)
 
 - 修复桌面端工作台来源校验：放行精确的 DSH Desktop 来源 `Origin: dsh-app://app`（含 `Sec-Fetch-Site` 豁免），同时继续要求专用请求头与 JSON 格式，并对跨源/无效来源返回 HTTP 403。

@@ -18,6 +18,7 @@ export declare class SecurityWorkbench {
     configFor(root: string): Promise<ResolvedSecureConfig>;
     autoEnabled(root: string): Promise<boolean>;
     automaticProblem(root: string, reason?: string): void;
+    private liveWorkspaces;
     private workspace;
     private report;
     runAutomatic(root: string, signal?: AbortSignal): Promise<any>;

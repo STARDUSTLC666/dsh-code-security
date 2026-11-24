@@ -18,6 +18,15 @@ type Job = { id: string; workspace: string; action: string; status: 'running' | 
 const hash = (text: string) => createHash('sha256').update(text).digest('hex')
 const json = (status: number, value: unknown) => new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } })
 
+class MissingWorkspace extends Error {
+  constructor() { super('工作区目录已移动或删除，已从当前列表隐藏。 / Workspace directory was moved or deleted and is hidden from the current list.') }
+}
+
+function isMissingPath(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException | undefined)?.code
+  return code === 'ENOENT' || code === 'ENOTDIR'
+}
+
 export class SecurityWorkbench {
   private readonly automaticProblems = new Map<string, string>()
   private readonly jobs = new Map<string, Job>()
@@ -65,9 +74,28 @@ export class SecurityWorkbench {
   }
   async autoEnabled(root: string): Promise<boolean> { return (await this.catalog()).workspaces.find(w => w.id === hash(root))?.autoCheck === true }
   automaticProblem(root: string, reason?: string): void { if (reason) this.automaticProblems.set(root, reason); else this.automaticProblems.delete(root) }
+  private async liveWorkspaces(data: Catalog): Promise<Workspace[]> {
+    const alive: Workspace[] = []
+    for (const row of data.workspaces) {
+      try {
+        if ((await fs.lstat(row.root)).isDirectory()) alive.push(row)
+      } catch (error) {
+        if (!isMissingPath(error)) alive.push(row)
+      }
+    }
+    return alive
+  }
   private async workspace(id: unknown): Promise<Workspace> {
     const row = (await this.catalog()).workspaces.find(w => typeof id === 'string' && w.id === id)
-    if (!row || await fs.realpath(row.root) !== row.root) throw new Error('请选择已登记的工作区 / Choose a registered workspace')
+    if (!row) throw new Error('请选择已登记的工作区 / Choose a registered workspace')
+    try {
+      if (await fs.realpath(row.root) !== row.root || !(await fs.lstat(row.root)).isDirectory()) {
+        throw new Error('请选择已登记的工作区 / Choose a registered workspace')
+      }
+    } catch (error) {
+      if (isMissingPath(error)) throw new MissingWorkspace()
+      throw error
+    }
     return row
   }
   private async report(row: Workspace) {
@@ -94,7 +122,28 @@ export class SecurityWorkbench {
     return selected.execute(args, { signal })
   }
   async action(body: Record<string, unknown>): Promise<any> {
-    if (body.operation === 'list') return { ok: true, ...await this.catalog() }
+    if (body.operation === 'list') {
+      const data = await this.catalog()
+      return { ok: true, ...data, workspaces: await this.liveWorkspaces(data) }
+    }
+    if (body.operation === 'remove-workspace') {
+      const targetId = typeof body.id === 'string' ? body.id : ''
+      if (!targetId) throw new Error('请选择已登记的工作区 / Choose a registered workspace')
+      let removed: Workspace | undefined
+      await this.update(data => {
+        removed = data.workspaces.find(w => w.id === targetId)
+        data.workspaces = data.workspaces.filter(w => w.id !== targetId)
+      })
+      if (removed) {
+        for (const job of this.jobs.values()) {
+          if (job.workspace === targetId && job.status === 'running') job.controller.abort(new Error('workspace removed'))
+        }
+        this.automaticProblems.delete(removed.root)
+        this.onAutoChanged?.(removed.root, false)
+      }
+      const next = await this.catalog()
+      return { ok: true, removed: Boolean(removed), workspaces: await this.liveWorkspaces(next) }
+    }
     const row = await this.workspace(body.id)
     if (body.operation === 'open') {
       const cfg = await this.configFor(row.root)
@@ -162,7 +211,10 @@ export class SecurityWorkbench {
       const body = JSON.parse(Buffer.concat(chunks).toString('utf8'))
       if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('Invalid operation')
       return json(200, await this.action(body))
-    } catch (error) { return json(400, { ok: false, message: redactText(error instanceof Error ? error.message : String(error)) }) }
+    } catch (error) {
+      if (error instanceof MissingWorkspace) return json(404, { ok: false, code: 'workspace_missing', message: error.message })
+      return json(400, { ok: false, message: redactText(error instanceof Error ? error.message : String(error)) })
+    }
   }
   async dispose(): Promise<void> { for (const job of this.jobs.values()) job.controller.abort(new Error('DSH disposed')); await Promise.allSettled([...this.jobs.values()].map(job => job.work)) }
 }

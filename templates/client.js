@@ -28,8 +28,11 @@ let securityHostContext;
         }
         catch {
             throw new Error(t('无法读取服务响应，请检查插件是否加载。', 'Could not read the response. Check that the plugin is loaded.'));
-        } if (!response.ok || value.ok === false)
-            throw new Error(message(value.message || t('操作未完成', 'The operation did not complete.'))); return value; }
+        } if (!response.ok || value.ok === false) {
+            const err = new Error(message(value.message || t('操作未完成', 'The operation did not complete.')));
+            err.code = value.code;
+            throw err;
+        } return value; }
         function Coverage({ rows }) {
             return rows?.length ? h('div', { className: 'secw-coverage' }, rows.map(row => h('div', { key: row.engine, className: 'secw-engine', 'data-dsh-card': '' },
                 h('div', { className: 'secw-engine-head' },
@@ -80,7 +83,7 @@ let securityHostContext;
                         }))));
         }
         function Workbench({ workbench = false } = {}) {
-            const [activeTab, setActiveTab] = useState('findings'), [switchTo, setSwitchTo] = useState(''), [copiedId, setCopiedId] = useState('');
+            const [activeTab, setActiveTab] = useState('findings'), [switchTo, setSwitchTo] = useState(''), [removeOpen, setRemoveOpen] = useState(false), [copiedId, setCopiedId] = useState('');
             const [resultsViewMode, setResultsViewModeState] = useState(() => {
                 try {
                     const saved = typeof window !== 'undefined' ? window.localStorage?.getItem('dsh-code-security:view-mode') : null;
@@ -118,7 +121,24 @@ let securityHostContext;
                     setJob(value.activeJob || null);
                 }
                 catch (e) {
-                    if (mounted.current && seq === generation.current) setError(message(e.message));
+                    if (mounted.current && seq === generation.current) {
+                        if (e.code === 'workspace_missing') {
+                            let nextId = '';
+                            setCatalog(prev => {
+                                const rest = prev.filter(w => w.id !== selected);
+                                nextId = rest[0]?.id || '';
+                                return rest;
+                            });
+                            setId('');
+                            setData(null);
+                            setJob(null);
+                            setResult(null);
+                            setError(message(e.message));
+                            if (nextId) void open(nextId);
+                        } else {
+                            setError(message(e.message));
+                        }
+                    }
                 }
                 finally {
                     if (mounted.current && seq === generation.current) {
@@ -149,6 +169,50 @@ let securityHostContext;
                     off?.();
                 };
             }, []);
+            useEffect(() => {
+                if (removeOpen || switchTo || dirty || job?.status === 'running')
+                    return;
+                let inflight = false, cancelled = false;
+                function syncWorkspaces() {
+                    if (cancelled || inflight || !mounted.current || (typeof document !== 'undefined' && document.visibilityState === 'hidden'))
+                        return;
+                    inflight = true;
+                    request({ operation: 'list' }).then(value => {
+                        if (cancelled || !mounted.current || !Array.isArray(value?.workspaces))
+                            return;
+                        const live = value.workspaces;
+                        setCatalog(live);
+                        if (id && !live.some(w => w.id === id)) {
+                            setJob(null);
+                            setResult(null);
+                            setDirty(false);
+                            setNotice(t('原工作区目录已不存在，已自动从列表移除。', 'The workspace folder no longer exists on disk and was removed from the list.'));
+                            if (live[0]) void open(live[0].id);
+                            else { setId(''); setData(null); }
+                        } else if (!id && live[0] && !loading) {
+                            void open(live[0].id);
+                        }
+                    }).catch(() => { /* silent background sync */ }).finally(() => {
+                        inflight = false;
+                    });
+                }
+                const onFocus = () => syncWorkspaces();
+                const onVisibility = () => { if (typeof document === 'undefined' || document.visibilityState !== 'hidden') syncWorkspaces(); };
+                if (typeof window !== 'undefined' && window.addEventListener)
+                    window.addEventListener('focus', onFocus);
+                if (typeof document !== 'undefined' && document.addEventListener)
+                    document.addEventListener('visibilitychange', onVisibility);
+                const timer = typeof setInterval === 'function' ? setInterval(syncWorkspaces, 8000) : null;
+                timer?.unref?.();
+                return () => {
+                    cancelled = true;
+                    if (timer != null && typeof clearInterval === 'function') clearInterval(timer);
+                    if (typeof window !== 'undefined' && window.removeEventListener)
+                        window.removeEventListener('focus', onFocus);
+                    if (typeof document !== 'undefined' && document.removeEventListener)
+                        document.removeEventListener('visibilitychange', onVisibility);
+                };
+            }, [id, loading, removeOpen, switchTo, dirty, job?.status]);
             useEffect(() => {
                 if (!job || job.status !== 'running' || !id) return;
                 let ended = false, timer;
@@ -187,6 +251,26 @@ let securityHostContext;
                 if (filter === 'high-risk') return list.filter(f => ['critical', 'high'].includes(f.severity));
                 return list;
             }, [report?.findings, fresh, filter]);
+            async function removeCurrentWorkspace() {
+                if (!id) return;
+                setError(''); setNotice('');
+                try {
+                    const value = await request({ operation: 'remove-workspace', id });
+                    if (!mounted.current) return;
+                    const rest = value.workspaces || [];
+                    setRemoveOpen(false);
+                    setCatalog(rest);
+                    setJob(null);
+                    setResult(null);
+                    setDirty(false);
+                    setNotice(t('已从工作台移除该项目记录（未删除任何本地文件）。', 'Workspace removed from the list (no local files were deleted).'));
+                    if (rest[0]) void open(rest[0].id);
+                    else { setId(''); setData(null); }
+                }
+                catch (e) {
+                    if (mounted.current) setError(message(e.message));
+                }
+            }
             async function run(name) {
                 setError(''); setNotice(''); setResult(null);
                 try {
@@ -372,7 +456,7 @@ let securityHostContext;
                 }) : null,
                 tourSteps: securityTourSteps,
                 tourStorageKey: 'dsh-code-security.tour.v1',
-                modalOpen: Boolean(switchTo),
+                modalOpen: Boolean(switchTo || removeOpen),
                 onTourCopyPrompt: async text => {
                     const ok = await W.writeClipboardText(text);
                     if (ok) {
@@ -385,7 +469,8 @@ let securityHostContext;
                     h(W.Button, { className: 'security-scan-action', variant: 'primary', icon: 'shield', 'data-tour': 'sec-scan', disabled, onClick: () => run('scan') }, t('检查代码', 'Scan code')),
                     h(W.Button, { className: 'security-scan-action', icon: 'search', disabled, onClick: () => run('diff') }, t('检查改动', 'Check changes')),
                     h(W.Button, { className: 'security-scan-action', icon: 'check', 'data-tour': 'sec-verify', disabled: disabled || !report?.hasScan, onClick: () => run('verify') }, t('复查修复', 'Recheck fixes')),
-                    h(W.IconButton, { icon: 'refresh', spinning: busy || loading, label: t('刷新结果', 'Refresh results'), disabled: busy || loading || dirty, onClick: () => open(id) })) : null,
+                    h(W.IconButton, { icon: 'refresh', spinning: busy || loading, label: t('刷新结果', 'Refresh results'), disabled: busy || loading || dirty, onClick: () => open(id) }),
+                    h(W.IconButton, { icon: 'trash', label: t('移出项目列表', 'Remove workspace from list'), disabled: busy || loading || !id, onClick: () => setRemoveOpen(true) })) : null,
             },
                 h('style', { 'data-plugin-css': 'dsh-code-security/workbench' }, SECURITY_WORKBENCH_CSS),
                 h(W.Status, { tone: 'error' }, error),
@@ -544,7 +629,18 @@ let securityHostContext;
                         h(W.Button, { onClick: () => setSwitchTo('') }, t('继续编辑', 'Keep editing')),
                         h(W.Button, { variant: 'danger', icon: 'trash', onClick: () => { const next = switchTo; setSwitchTo(''); void open(next); } }, t('放弃修改并切换', 'Discard and switch')),
                         h(W.Button, { variant: 'primary', icon: 'check', onClick: async () => { if (await save()) { const next = switchTo; setSwitchTo(''); void open(next); } } }, t('保存并切换', 'Save and switch'))),
-                }, h('p', null, t('切换项目之前，选择如何处理当前修改。', 'Choose what to do with the current settings before switching projects.'))) : null);
+                }, h('p', null, t('切换项目之前，选择如何处理当前修改。', 'Choose what to do with the current settings before switching projects.'))) : null,
+                removeOpen && id ? h(W.Dialog, {
+                    title: t('移出工作区列表', 'Remove workspace from list'),
+                    tone: 'warn',
+                    closeLabel: t('取消', 'Cancel'),
+                    onClose: () => setRemoveOpen(false),
+                    footer: h(React.Fragment, null,
+                        h(W.Button, { onClick: () => setRemoveOpen(false) }, t('取消', 'Cancel')),
+                        h(W.Button, { variant: 'danger', icon: 'trash', disabled: busy, onClick: removeCurrentWorkspace }, t('确认移出列表', 'Confirm remove'))),
+                },
+                    h('p', null, t('将从代码安全工作台移除当前工作区记录并关闭其自动检查，不会删除硬盘上的任何项目文件。之后在对话中再次扫描即可重新登记。', 'Removes this workspace from the Code Security list and turns off automatic checks for it. No files on disk are deleted; scan the workspace again in chat to re-register it.')),
+                    data?.workspace?.root ? h('p', { className: 'secw-file' }, data.workspace.root) : null) : null);
         }
         function apply(ctx) {
             securityHostContext = ctx;
