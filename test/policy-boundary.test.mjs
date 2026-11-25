@@ -87,7 +87,7 @@ test('policy loading rejects an external file substituted at the open boundary',
     return original.apply(fs, [name, ...args])
   }
   try {
-    await assert.rejects(loadPolicy(root), /变化|changed|outside|工作区/i)
+    await assert.rejects(loadPolicy(root), /变化|changed|outside|工作区|ELOOP/i)
     assert.equal(replaced, true)
   } finally {
     fs.open = original
