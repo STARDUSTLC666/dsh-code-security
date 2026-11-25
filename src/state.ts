@@ -14,6 +14,7 @@ import { evidenceFingerprint, protectFinding, redactText } from './privacy.js'
 import type { SourceEngine } from './config.js'
 import type { EngineCoverage } from './engines.js'
 import type { ScanScope } from './audit.js'
+import { boundedFile } from './workspace.js'
 
 export interface ScanStateEntry {
   complete?: boolean
@@ -71,7 +72,7 @@ async function readState(stateDir: string): Promise<StateDocument> {
   try {
     const info = await fs.lstat(statePath(stateDir))
     if (!info.isFile() || info.isSymbolicLink() || info.size > 16 * 1024 * 1024) throw new Error('记录不是普通文件或超过 16 MiB')
-    const text = await fs.readFile(statePath(stateDir), 'utf8')
+    const text = (await boundedFile(statePath(stateDir), 16 * 1024 * 1024, undefined, info)).toString('utf8')
     const parsed: unknown = JSON.parse(text)
     const obj = (parsed ?? {}) as Record<string, unknown>
     if (!Array.isArray(obj.history) || obj.history.some(entry => !isEntry(entry)) || obj.last !== null && !isEntry(obj.last) || obj.baseline !== undefined && obj.baseline !== null && !isBaseline(obj.baseline)) throw new Error('记录结构无效')

@@ -114,6 +114,8 @@ Override any of the 8 plugin-level configuration keys under the `code-security` 
 
 Defaults: 5,000 files, 2 MiB per file, at most 64 MiB per enhanced snapshot. Build directories, node_modules, .git and .code-security are excluded; symlinks/junctions are not followed. Unreadable/oversized files and parse/output limits are explicitly incomplete. Current scans cover a workspace or Git diff, not every historical commit.
 
+The policy must be a regular file inside the workspace and no larger than 256 KiB. It allows up to 256 exclude patterns and 512 ignore rules; each glob is limited to 1,024 characters and 32 KiB total. A diff scan parses at most 100,000 lines, 2,000 files and 50,000 added lines; untracked inventories are capped at 10,000 paths. Exceeding a limit fails the check and preserves the previous result.
+
 Relative stateDir defaults to the session project's .code-security. Locks and atomic replacement protect concurrent history/baseline writes. Corrupt records are preserved and reported. Legacy findings, history and baselines are migrated to redacted evidence while retaining fingerprints computed from original evidence. Complete detected credentials are not returned to the model or reports.
 
 Policy file: `.code-security.json`.

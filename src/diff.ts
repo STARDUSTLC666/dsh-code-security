@@ -33,6 +33,24 @@ export interface DiffScanResult {
   diff: string
 }
 
+const MAX_DIFF_LINES = 100_000
+const MAX_DIFF_FILES = 2_000
+const MAX_DIFF_ADDED_LINES = 50_000
+
+function* lines(value: string): Generator<string> {
+  let start = 0
+  for (;;) {
+    const end = value.indexOf('\n', start)
+    if (end < 0) {
+      if (start < value.length) yield value.slice(start)
+      return
+    }
+    const stop = end > start && value.charCodeAt(end - 1) === 13 ? end - 1 : end
+    yield value.slice(start, stop)
+    start = end + 1
+  }
+}
+
 /**
  * 屏蔽仓库自带配置里的可执行钩子。
  *
@@ -77,6 +95,10 @@ function invalidDiff(): Error {
   return new Error('git diff 不完整或格式无效，无法确认已审查全部新增行。')
 }
 
+function diffLimit(): Error {
+  return new Error('git diff 超过解析上限（100000 行、2000 个文件、50000 行新增内容），审查未完成，已有记录未覆盖。')
+}
+
 /** Git quotes unusual path bytes using C escapes, including octal UTF-8. */
 function decodeGitPath(value: string): string {
   if (!value.startsWith('"')) return value.replace(/\t.*$/, '')
@@ -117,11 +139,15 @@ export function parseDiff(diff: string, cwd: string): DiffFile[] {
   let oldRemaining = 0
   let newRemaining = 0
   let hasFileHeader = false
-  for (const raw of diff.split(/\r?\n/)) {
+  let lineCount = 0
+  let addedLineCount = 0
+  for (const raw of lines(diff)) {
+    if (++lineCount > MAX_DIFF_LINES) throw diffLimit()
     // Interpret hunk bodies before headers: source text may itself start "+++".
     if (oldRemaining > 0 || newRemaining > 0) {
       if (raw.startsWith('\\')) continue
       if (raw.startsWith('+') && newRemaining > 0) {
+        if (++addedLineCount > MAX_DIFF_ADDED_LINES) throw diffLimit()
         current?.added.push({ line: newLine, text: raw.slice(1) })
         newRemaining--
         newLine++
@@ -146,7 +172,10 @@ export function parseDiff(diff: string, cwd: string): DiffFile[] {
       const file = decodeGitPath(raw.slice(4))
       if (file !== '/dev/null' && (!file.startsWith('b/') || file.length <= 2)) throw invalidDiff()
       current = file === '/dev/null' ? null : { file: file.slice(2), added: [] }
-      if (current !== null) files.push(current)
+      if (current !== null) {
+        if (files.length >= MAX_DIFF_FILES) throw diffLimit()
+        files.push(current)
+      }
       hasFileHeader = true
       newLine = 0
       continue

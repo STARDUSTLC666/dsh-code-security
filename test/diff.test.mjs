@@ -86,6 +86,10 @@ test('parseDiff rejects a truncated hunk instead of returning a partial clean re
   ].join('\n'), 'C:/repo'), /diff.*不完整|diff.*格式无效/)
 })
 
+test('parseDiff stops at a bounded line count without expanding the input into an array', () => {
+  assert.throws(() => parseDiff('x\n'.repeat(100001), 'C:/repo'), /超过解析上限/)
+})
+
 test('diff context honors existing next-line suppressions without reporting old findings', () => {
   const diff = [
     'diff --git a/a.js b/a.js', '--- a/a.js', '+++ b/a.js',

@@ -1,5 +1,11 @@
 # 更新记录
 
+## 0.10.4 (2026-11-25)
+
+- 限制策略读取与 glob 规模，修复字面字符误匹配，为 diff/路径解析设置上限，并核对已打开扫描记录的文件身份。
+- Bound policy loading, compile literal-safe policy globs, cap diff/path parsing, and verify opened scan-state identity.
+
+
 ## 0.10.3 (2026-11-25)
 
 - 扫描源码、依赖清单及增量审查时，核验打开前后的文件身份与工作区边界，拒绝扫描途中被替换的外部链接，并明确报告覆盖不完整。

@@ -7,6 +7,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { boundedFile, workspaceTarget } from './workspace.js'
 
 export interface PolicyIgnore {
   ruleId?: string
@@ -28,6 +29,11 @@ export const DEFAULT_POLICY: SecurePolicy = Object.freeze({
 })
 
 export const POLICY_FILE = '.code-security.json'
+const MAX_POLICY_FILE_BYTES = 256 * 1024
+const MAX_POLICY_EXCLUDES = 256
+const MAX_POLICY_IGNORES = 512
+const MAX_POLICY_PATTERN_LENGTH = 1024
+const MAX_POLICY_PATTERN_TOTAL_LENGTH = 32 * 1024
 
 export function policyPath(cwd: string): string {
   return path.join(cwd, POLICY_FILE)
@@ -35,7 +41,11 @@ export function policyPath(cwd: string): string {
 
 export async function loadPolicy(cwd: string): Promise<SecurePolicy> {
   try {
-    const text = await fs.readFile(policyPath(cwd), 'utf8')
+    const file = await workspaceTarget(cwd, POLICY_FILE)
+    const stat = await fs.lstat(file)
+    if (!stat.isFile() || stat.isSymbolicLink()) throw new Error('安全策略必须是工作区内的普通文件 / Security policy must be a regular file inside the workspace')
+    const workspaceRoot = await fs.realpath(cwd)
+    const text = (await boundedFile(file, MAX_POLICY_FILE_BYTES, undefined, stat, workspaceRoot)).toString('utf8')
     const parsed: unknown = JSON.parse(text)
     const obj = (parsed ?? {}) as Record<string, unknown>
     return normalizePolicy(obj)
@@ -46,8 +56,20 @@ export async function loadPolicy(cwd: string): Promise<SecurePolicy> {
 }
 
 export function normalizePolicy(obj: Record<string, unknown>): SecurePolicy {
-  const exclude = Array.isArray(obj.exclude) ? obj.exclude.filter((x): x is string => typeof x === 'string') : []
+  const excludeRaw = Array.isArray(obj.exclude) ? obj.exclude : []
   const ignoreRaw = Array.isArray(obj.ignore) ? obj.ignore : []
+  if (excludeRaw.length > MAX_POLICY_EXCLUDES) throw new Error('安全策略排除项超过数量上限。')
+  if (ignoreRaw.length > MAX_POLICY_IGNORES) throw new Error('安全策略忽略项超过数量上限。')
+  let patternLength = 0
+  const checkedPattern = (value: unknown, label: string): string => {
+    if (typeof value !== 'string') throw new Error(label + '必须是字符串。')
+    if (value.length > MAX_POLICY_PATTERN_LENGTH) throw new Error(label + '超过长度上限。')
+    patternLength += value.length
+    if (patternLength > MAX_POLICY_PATTERN_TOTAL_LENGTH) throw new Error('安全策略 glob 总长度超过上限。')
+    globToRegex(value)
+    return value
+  }
+  const exclude = excludeRaw.map(value => checkedPattern(value, '安全策略排除项'))
   const ignore: PolicyIgnore[] = []
   for (const item of ignoreRaw) {
     if (typeof item !== 'object' || item === null) continue
@@ -55,7 +77,7 @@ export function normalizePolicy(obj: Record<string, unknown>): SecurePolicy {
     if (!(typeof rec.ruleId === 'string' && rec.ruleId.trim() !== '') && !(typeof rec.file === 'string' && rec.file.trim() !== '')) throw new Error('每条忽略规则必须指定 ruleId 或 file，空规则不能禁用全部检查。')
     ignore.push({
       ruleId: typeof rec.ruleId === 'string' && rec.ruleId !== '' ? rec.ruleId : undefined,
-      file: typeof rec.file === 'string' && rec.file !== '' ? rec.file : undefined,
+      file: typeof rec.file === 'string' && rec.file !== '' ? checkedPattern(rec.file, '安全策略文件模式') : undefined,
       reason: typeof rec.reason === 'string' ? rec.reason : '',
     })
   }
@@ -65,9 +87,11 @@ export function normalizePolicy(obj: Record<string, unknown>): SecurePolicy {
 
 export async function savePolicy(cwd: string, policy: SecurePolicy, signal?: AbortSignal): Promise<string> {
   signal?.throwIfAborted()
+  const contents = JSON.stringify(policy, null, 2) + '\n'
+  if (Buffer.byteLength(contents) > MAX_POLICY_FILE_BYTES) throw new Error('安全策略超过 256 KiB 大小上限，原文件已保留。')
   const file = policyPath(cwd)
   const tmp = file + '.tmp-' + randomUUID()
-  try { await fs.writeFile(tmp, JSON.stringify(policy, null, 2) + '\n', { flag: 'wx', mode: 0o600, signal }); signal?.throwIfAborted(); await fs.rename(tmp, file) }
+  try { await fs.writeFile(tmp, contents, { flag: 'wx', mode: 0o600, signal }); signal?.throwIfAborted(); await fs.rename(tmp, file) }
   finally { await fs.unlink(tmp).catch(() => {}) }
   return file
 }
@@ -77,14 +101,23 @@ const GLOB_CACHE_MAX_LENGTH = 4096
 const globCache = new Map<string, RegExp>()
 
 function globToRegex(glob: string): RegExp {
+  if (glob.length > MAX_POLICY_PATTERN_LENGTH) throw new Error('安全策略 glob 模式超过长度上限。')
   const cached = globCache.get(glob)
   if (cached) {
     globCache.delete(glob)
     globCache.set(glob, cached)
     return cached
   }
-  const escaped = glob.replace(/[.+^$()|{}]/g, '\\$&').replace(/\*\*/g, '§§').replace(/\*/g, '[^/]*').replace(/§§/g, '.*')
-  const regex = new RegExp('(^|/)' + escaped + '($|/)')
+  let source = ''
+  for (let index = 0; index < glob.length; index++) {
+    if (glob[index] !== '*') {
+      source += /[.*+?^${}()|[\]\\]/.test(glob[index]!) ? '\\' + glob[index] : glob[index]
+      continue
+    }
+    if (glob[index + 1] === '*') { source += '.*'; index++ }
+    else source += '[^/]*'
+  }
+  const regex = new RegExp('(^|/)' + source + '($|/)')
   if (glob.length <= GLOB_CACHE_MAX_LENGTH) {
     if (globCache.size >= GLOB_CACHE_LIMIT) globCache.delete(globCache.keys().next().value!)
     globCache.set(glob, regex)

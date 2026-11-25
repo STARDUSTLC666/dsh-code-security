@@ -156,6 +156,32 @@ test('invalid Git parameters and truncated patches cannot replace scan state', a
   assert.equal(await fs.readFile(stateFile, 'utf8'), before)
 })
 
+test('oversized added-line diffs cannot replace scan state', async t => {
+  const { root, write, tools } = await project(t, { 'large.txt': 'baseline\n' })
+  await tools.find(tool => tool.name === 'secure_scan').execute({}, {})
+  const stateFile = path.join(root, '.code-security/state.json')
+  const before = await fs.readFile(stateFile, 'utf8')
+  await write('large.txt', 'new line\n'.repeat(50001))
+  await assert.rejects(tools.find(tool => tool.name === 'secure_diff').execute({}, {}), /超过解析上限/)
+  assert.equal(await fs.readFile(stateFile, 'utf8'), before)
+})
+
+test('oversized untracked path lists are rejected before scanning and preserve state', async t => {
+  const { root, tools } = await project(t, { 'tracked.js': 'const safe = 1\n' })
+  await tools.find(tool => tool.name === 'secure_scan').execute({}, {})
+  const stateFile = path.join(root, '.code-security/state.json')
+  const before = await fs.readFile(stateFile, 'utf8')
+  const cappedRunner = {
+    async run(argv, options = {}) {
+      if (argv.includes('ls-files')) return { exitCode: 0, signal: null, stdout: 'untracked.js\0'.repeat(10001), stderr: '' }
+      return runner.run(argv, options)
+    },
+  }
+  const diff = buildSecureTools(resolveConfig({}, root), root, cappedRunner).find(tool => tool.name === 'secure_diff')
+  await assert.rejects(diff.execute({ includeUntracked: true }, {}), /未跟踪文件列表超过解析上限/)
+  assert.equal(await fs.readFile(stateFile, 'utf8'), before)
+})
+
 test('full/diff scans share baselines and accept legacy dot-prefixed state paths', async t => {
   const { root, write, tools } = await project(t, { 'src/a.js': 'const safe = 1\n' })
   await write('src/a.js', 'const safe = 1\neval(input)\n')

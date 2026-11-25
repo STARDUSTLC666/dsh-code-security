@@ -10,6 +10,32 @@ import { mergeFindings, scanExternal, type EngineCoverage, type ScanDocument } f
 import { boundedFile } from './workspace.js'
 
 export type ScanScope = { kind: 'scan'; target?: string } | { kind: 'diff'; target?: string; base: string; staged: boolean; includeUntracked?: boolean }
+const MAX_UNTRACKED_PATHS = 10_000
+
+function countGitPaths(value: string): number {
+  let count = 0, start = 0
+  for (let index = 0; index < value.length; index++) {
+    if (value.charCodeAt(index) !== 0) continue
+    if (index > start) count++
+    start = index + 1
+  }
+  if (start < value.length) count++
+  return count
+}
+
+function* gitPaths(value: string): Generator<string> {
+  let start = 0
+  for (;;) {
+    const end = value.indexOf('\0', start)
+    if (end < 0) {
+      if (start < value.length) yield value.slice(start)
+      return
+    }
+    if (end > start) yield value.slice(start, end)
+    start = end + 1
+  }
+}
+
 export function sourceEngines(value: unknown, defaults: SourceEngine[]): SourceEngine[] {
   if (value === undefined) return [...defaults]
   if (!Array.isArray(value) || !value.length || value.length > 3 || value.some(e => !['builtin','betterleaks','semgrep'].includes(e)) || new Set(value).size !== value.length) throw new Error('engines 必须从 builtin、betterleaks、semgrep 中选择，不能重复或为空。')
@@ -58,8 +84,8 @@ export async function runSourceCheck(scope: ScanScope, cfg: ResolvedSecureConfig
       const untracked = await runner.run(['git', ...GIT_SAFE_CONFIG_ARGS, 'ls-files', '--others', '--exclude-standard', '-z', '--', scope.target ?? '.'], { cwd, signal, timeoutMs: 30000 })
       if (untracked.exitCode !== 0) throw new Error('无法读取未跟踪文件列表')
       if (untracked.stdout && !untracked.stdout.endsWith('\0')) throw new Error('未跟踪文件列表不完整，已有记录未覆盖')
-      const names = untracked.stdout.split('\0').filter(Boolean)
-      for (const name of names) {
+      if (countGitPaths(untracked.stdout) > MAX_UNTRACKED_PATHS) throw new Error('未跟踪文件列表超过解析上限（10000 个文件），审查未完成，已有记录未覆盖。')
+      for (const name of gitPaths(untracked.stdout)) {
         signal?.throwIfAborted()
         if (result.filesScanned >= cfg.maxFiles) { result.complete = false; result.warnings.push('已达到文件数量上限'); break }
         if (path.isAbsolute(name) || name.split(/[\\/]/).includes('..')) throw new Error('未跟踪文件超出当前工作区')

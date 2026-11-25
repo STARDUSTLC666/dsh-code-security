@@ -1,7 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import fs from 'node:fs/promises'
 import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises'
-import { dirname, join, relative, isAbsolute } from 'node:path'
+import { dirname, join, relative, isAbsolute, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { loadState, saveState, saveBaseline } from '../lib/state.js'
 import lockfile from 'proper-lockfile'
@@ -29,6 +30,32 @@ test('损坏记录不被新扫描或基线覆盖', async t => {
     await assert.rejects(saveState(dir, entry(1)), /原文件已保留/)
     await assert.rejects(saveBaseline(dir, { time: '', target: '.', reason: '', findings: [], fingerprints: [], counts }), /原文件已保留/)
     assert.equal(await readFile(join(dir, 'state.json'), 'utf8'), bytes)
+  }
+})
+
+test('state loading rejects an external file substituted after metadata validation', async t => {
+  const dir = await fixture(t)
+  await saveState(dir, entry(1))
+  const file = join(dir, 'state.json'), outside = join(dir, 'outside.json')
+  const before = await readFile(file, 'utf8')
+  await writeFile(outside, JSON.stringify({ last: null, history: [], baseline: null }))
+  const original = fs.open
+  let replaced = false
+  fs.open = async function (name, ...args) {
+    if (!replaced && resolve(String(name)) === resolve(file)) {
+      replaced = true
+      await fs.rename(file, file + '.checked')
+      if (process.platform === 'win32') await fs.link(outside, file)
+      else await fs.symlink(outside, file)
+    }
+    return original.apply(this, [name, ...args])
+  }
+  try {
+    await assert.rejects(loadState(dir), /无法读取/)
+    assert.equal(replaced, true)
+    assert.equal(await readFile(file + '.checked', 'utf8'), before)
+  } finally {
+    fs.open = original
   }
 })
 
