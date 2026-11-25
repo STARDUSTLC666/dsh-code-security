@@ -1,5 +1,14 @@
 # 更新记录
 
+## 0.10.3 (2026-11-25)
+
+- 扫描源码、依赖清单及增量审查时，核验打开前后的文件身份与工作区边界，拒绝扫描途中被替换的外部链接，并明确报告覆盖不完整。
+- 目录改为逐项流式遍历，限制超大目录的访问数量；依赖扫描对不存在的目标继续返回不完整覆盖结果。
+- 为安全策略 glob 编译加入有界 LRU 缓存，减少重复匹配开销，策略修改后立即按新规则生效。
+- Verify file identity and workspace boundaries before consuming source, dependency, and incremental-review documents; reject substituted external links and report incomplete coverage.
+- Stream directory traversal with a visit budget, and retain incomplete results for missing dependency-scan targets.
+- Cache compiled policy globs with a bounded LRU while applying policy edits immediately.
+
 ## 0.10.2 (2026-11-24)
 
 - 工作台顶栏新增 **「移出项目列表」** 入口与确认弹窗（`remove-workspace`），可从 `workspaces.json` 移除工作区记录、中止进行中扫描并关闭自动检查，绝不删除磁盘上的源代码文件。
