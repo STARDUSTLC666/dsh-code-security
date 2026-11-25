@@ -17,6 +17,7 @@ export function sourceEngines(value: unknown, defaults: SourceEngine[]): SourceE
 }
 
 export async function runSourceCheck(scope: ScanScope, cfg: ResolvedSecureConfig, cwd: string, runner: ProcessRunner, engines: SourceEngine[], policy: SecurePolicy, signal?: AbortSignal) {
+  const workspaceRoot = await fs.realpath(cwd)
   const documents: ScanDocument[] = []; let documentBytes = 0, truncated = false
   const collect = (doc: ScanDocument) => { const size = Buffer.byteLength(doc.text); if (documentBytes + size > 64 * 1024 * 1024) { truncated = true; return }; documentBytes += size; documents.push(doc) }
   let result
@@ -38,9 +39,13 @@ export async function runSourceCheck(scope: ScanScope, cfg: ResolvedSecureConfig
           text = shown.stdout
         } else {
           const stat = await fs.lstat(absolute)
-          if (!stat.isFile() || stat.isSymbolicLink() || await fs.realpath(absolute) !== absolute) throw new Error('增量文件不是工作区内的普通文件')
+          if (!stat.isFile() || stat.isSymbolicLink()) throw new Error('增量文件不是工作区内的普通文件')
           if (stat.size > cfg.maxFileBytes) { truncated = true; continue }
-          text = (await boundedFile(absolute, cfg.maxFileBytes, signal)).toString('utf8')
+          try { text = (await boundedFile(absolute, cfg.maxFileBytes, signal, stat, workspaceRoot)).toString('utf8') }
+          catch (error) {
+            if (['SCAN_FILE_CHANGED', 'SCAN_FILE_OUTSIDE_WORKSPACE'].includes(String((error as NodeJS.ErrnoException).code))) throw new Error('增量文件在扫描期间已变化或移出工作区，请刷新后重试')
+            throw error
+          }
         }
         if (Buffer.byteLength(text) > cfg.maxFileBytes) { truncated = true; continue }
         const lines = text.split(/\r?\n/)

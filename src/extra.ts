@@ -98,10 +98,11 @@ export function buildExtraTools(cfg: ResolvedSecureConfig, cwd: string, signal?:
       const mode = args.audit ?? 'none'
       if (!['none','offline','online'].includes(String(mode))) throw new Error('audit 只支持 none、offline、online')
       const target = optionalString(args, 'target')
+      const workspaceRoot = await fs.realpath(cwd)
       const root = await workspaceTarget(cwd, target ?? '.')
       const documents: ScanDocument[] = []; let bytes = 0, truncated = false
       const rootDir = (await fs.lstat(root)).isDirectory() ? root : path.dirname(root)
-      const inventory = await scanDeps(root, { maxFiles: cfg.maxFiles, maxFileBytes: cfg.maxFileBytes, signal, policy: await loadPolicy(cwd),
+      const inventory = await scanDeps(root, { maxFiles: cfg.maxFiles, maxFileBytes: cfg.maxFileBytes, signal, policy: await loadPolicy(cwd), workspaceRoot,
         ...(mode === 'none' ? {} : { onDocument(doc: ScanDocument) { if (bytes + Buffer.byteLength(doc.text) > 64 * 1024 * 1024) { truncated = true; return }; bytes += Buffer.byteLength(doc.text); documents.push({ file: path.relative(cwd, path.join(rootDir, doc.file)).split(path.sep).join('/'), text: doc.text }) } }) })
       if (mode === 'none') return { ...inventory, audited: false, audit: null }
       if (!runner) throw new Error('OSV 审计需要宿主 subprocess 服务')

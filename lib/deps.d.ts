@@ -23,6 +23,7 @@ export declare function scanDeps(root: string, options?: {
     maxFileBytes?: number;
     signal?: AbortSignal;
     policy?: SecurePolicy;
+    workspaceRoot?: string;
     onDocument?: (document: {
         file: string;
         text: string;

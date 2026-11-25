@@ -33,9 +33,10 @@ function riskOfSpec(spec: string): Pick<DependencyEntry, 'risk' | 'note'> {
   return { risk: 'unpinned', note: '未能识别固定版本' }
 }
 
-export async function scanDeps(root: string, options: { maxFiles?: number; maxFileBytes?: number; signal?: AbortSignal; policy?: SecurePolicy; onDocument?: (document: { file: string; text: string }) => void } = {}): Promise<DepsScanResult> {
+export async function scanDeps(root: string, options: { maxFiles?: number; maxFileBytes?: number; signal?: AbortSignal; policy?: SecurePolicy; workspaceRoot?: string; onDocument?: (document: { file: string; text: string }) => void } = {}): Promise<DepsScanResult> {
   const dependencies: DependencyEntry[] = [], warnings: string[] = []
   const lockfiles: string[] = []
+  let workspaceRoot = options.workspaceRoot
   let filesScanned = 0, filesSkipped = 0, visited = 0, complete = true
   const warn = (text: string) => { complete = false; if (warnings.length < 100) warnings.push(text) }
   function add(name: string, rawSpec: string, manager: DependencyEntry['manager'], file: string, kind: DependencyEntry['kind']) {
@@ -102,21 +103,41 @@ export async function scanDeps(root: string, options: { maxFiles?: number; maxFi
     let stat
     try { stat = await fs.lstat(absolute) } catch { filesSkipped++; warn('无法读取 ' + rel); return }
     if (stat.isSymbolicLink()) { filesSkipped++; if (absolute === path.resolve(root)) warn('目标为链接，未读取链接内容'); return }
+    if (!workspaceRoot) {
+      try { workspaceRoot = await fs.realpath(root) }
+      catch { options.signal?.throwIfAborted(); filesSkipped++; warn('无法读取 ' + rel); return }
+    }
     if (stat.isDirectory()) {
-      let entries
-      try { entries = await fs.readdir(absolute, { withFileTypes: true }) } catch { warn('无法遍历 ' + rel); return }
-      for (const entry of entries) { if (visited > 100000 || filesScanned >= (options.maxFiles ?? 5000)) { warn('已达到扫描数量上限'); break }; await visit(path.join(absolute, entry.name), rel ? rel + '/' + entry.name : entry.name) }
+      let directory
+      try {
+        directory = await fs.opendir(absolute)
+        for await (const entry of directory) {
+          if (visited > 100000 || filesScanned >= (options.maxFiles ?? 5000)) { warn('已达到扫描数量上限'); break }
+          await visit(path.join(absolute, entry.name), rel ? rel + '/' + entry.name : entry.name)
+        }
+      } catch { options.signal?.throwIfAborted(); warn('无法遍历 ' + rel) }
+      finally { await directory?.close().catch(() => {}) }
       return
     }
     if (!stat.isFile() || !MANIFESTS.includes(path.basename(absolute)) && !LOCKFILES.includes(path.basename(absolute))) return
     if (stat.size > (options.maxFileBytes ?? 2 * 1024 * 1024)) { filesSkipped++; warn(rel + ' 超过文件大小上限'); return }
+    const file = rel || path.basename(absolute)
+    let text: string
+    try {
+      text = (await boundedFile(absolute, options.maxFileBytes ?? 2 * 1024 * 1024, options.signal, stat, workspaceRoot)).toString('utf8')
+    }
+    catch (error) {
+      options.signal?.throwIfAborted()
+      filesSkipped++
+      const code = (error as NodeJS.ErrnoException).code
+      warn(code === 'SCAN_FILE_CHANGED' || code === 'SCAN_FILE_OUTSIDE_WORKSPACE' ? file + ' 扫描期间文件已变化或移出工作区，未读取' : '无法读取 ' + file + '，本文件不计作已确认安全')
+      return
+    }
     filesScanned++
     try {
-      const text = (await boundedFile(absolute, options.maxFileBytes ?? 2 * 1024 * 1024, options.signal)).toString('utf8'), file = rel || path.basename(absolute)
       if (LOCKFILES.includes(path.basename(absolute))) { lockfiles.push(file); options.onDocument?.({ file, text }) }
       if (MANIFESTS.includes(path.basename(absolute))) parse(text, path.basename(absolute), file)
-    }
-    catch { options.signal?.throwIfAborted(); warn('无法解析 ' + (rel || path.basename(absolute)) + '：清单格式无效，本文件不计作已确认安全') }
+    } catch { options.signal?.throwIfAborted(); warn('无法解析 ' + file + '：清单格式无效，本文件不计作已确认安全') }
   }
   await visit(path.resolve(root), '')
   return { root, filesScanned, filesSkipped, dependencies, riskyCount: dependencies.filter(item => !['exact', 'range'].includes(item.risk)).length, warnings, complete, lockfiles }

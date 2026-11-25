@@ -42,6 +42,8 @@ export interface ScanOptions {
     maxFileBytes: number;
     policy: SecurePolicy;
     signal?: AbortSignal;
+    /** Maximum directory entries visited, including files excluded by policy. */
+    maxEntries?: number;
 }
 export interface LineEntry {
     line: number;

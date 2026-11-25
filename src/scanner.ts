@@ -50,6 +50,8 @@ export interface ScanOptions {
   maxFileBytes: number
   policy: SecurePolicy
   signal?: AbortSignal
+  /** Maximum directory entries visited, including files excluded by policy. */
+  maxEntries?: number
 }
 
 const DISABLE_NEXT = /secure-review-disable-next-line(?:\s+([\w,-]+))?/
@@ -90,6 +92,7 @@ function shouldScanFile(file: string): boolean {
 }
 
 const TOKEN_PATTERN = /['"]([A-Za-z0-9+/=_-]{24,})['"]/g
+const MAX_VISITED_ENTRIES = 100_000
 
 /** Only dismiss structured public metadata in its matching, non-credential context. */
 function publicMetadata(token: string, prefix: string): boolean {
@@ -259,6 +262,7 @@ export function isExcludedPath(rel: string, policy: SecurePolicy): boolean {
 export async function scanPath(options: ScanOptions): Promise<ScanResult> {
   const started = Date.now()
   const { cwd, maxFiles, maxFileBytes, policy } = options
+  const workspaceRoot = await fs.realpath(cwd)
   const root = await workspaceTarget(cwd, options.target?.trim() || '.')
   let filesScanned = 0
   let filesSkipped = 0
@@ -266,6 +270,8 @@ export async function scanPath(options: ScanOptions): Promise<ScanResult> {
   const relRoot = path.relative(cwd, root).split(path.sep).join('/')
   let complete = true
   const warnings: string[] = []
+  let visitedEntries = 0
+  const maxEntries = Number.isSafeInteger(options.maxEntries) ? Math.min(MAX_VISITED_ENTRIES, Math.max(1, options.maxEntries!)) : MAX_VISITED_ENTRIES
   const incomplete = (message: string) => { complete = false; if (warnings.length < 50) warnings.push(message) }
 
   const visit = async (absolute: string, rel: string): Promise<void> => {
@@ -286,17 +292,27 @@ export async function scanPath(options: ScanOptions): Promise<ScanResult> {
     if (stat.isSymbolicLink()) { filesSkipped += 1; if (absolute === root) incomplete('目标为链接，未读取链接内容'); return }
     if (stat.isDirectory()) {
       if (DEFAULT_EXCLUDE_DIRS.includes(path.basename(absolute))) return
-      let entries
+      let directory
       try {
-        entries = await fs.readdir(absolute, { withFileTypes: true })
+        directory = await fs.opendir(absolute)
       } catch {
         filesSkipped += 1
         incomplete('无法遍历 ' + rel)
         return
       }
-      for (const entry of entries) {
-        if (filesScanned >= maxFiles) { incomplete('已达到文件数量上限'); return }
-        await visit(path.join(absolute, entry.name), rel === '' ? entry.name : rel + '/' + entry.name)
+      try {
+        for await (const entry of directory) {
+          if (filesScanned >= maxFiles) { incomplete('已达到文件数量上限'); break }
+          if (visitedEntries >= maxEntries) { incomplete('已达到目录项数量上限'); break }
+          visitedEntries += 1
+          await visit(path.join(absolute, entry.name), rel === '' ? entry.name : rel + '/' + entry.name)
+        }
+      } catch {
+        options.signal?.throwIfAborted()
+        filesSkipped += 1
+        incomplete('无法遍历 ' + rel)
+      } finally {
+        await directory.close().catch(() => {})
       }
       return
     }
@@ -311,11 +327,12 @@ export async function scanPath(options: ScanOptions): Promise<ScanResult> {
     }
     let buffer: Uint8Array
     try {
-      buffer = await boundedFile(absolute, maxFileBytes, options.signal)
+      buffer = await boundedFile(absolute, maxFileBytes, options.signal, stat, workspaceRoot)
     } catch (error) {
       options.signal?.throwIfAborted()
       filesSkipped += 1
-      incomplete((error as NodeJS.ErrnoException).code === 'SCAN_FILE_TOO_LARGE' ? rel + ' 超过文件大小上限' : '无法读取 ' + rel)
+      const code = (error as NodeJS.ErrnoException).code
+      incomplete(code === 'SCAN_FILE_TOO_LARGE' ? rel + ' 超过文件大小上限' : code === 'SCAN_FILE_CHANGED' || code === 'SCAN_FILE_OUTSIDE_WORKSPACE' ? rel + ' 扫描期间文件已变化或移出工作区' : '无法读取 ' + rel)
       return
     }
     if (fileHasBinary(buffer)) {

@@ -72,9 +72,24 @@ export async function savePolicy(cwd: string, policy: SecurePolicy, signal?: Abo
   return file
 }
 
+const GLOB_CACHE_LIMIT = 256
+const GLOB_CACHE_MAX_LENGTH = 4096
+const globCache = new Map<string, RegExp>()
+
 function globToRegex(glob: string): RegExp {
+  const cached = globCache.get(glob)
+  if (cached) {
+    globCache.delete(glob)
+    globCache.set(glob, cached)
+    return cached
+  }
   const escaped = glob.replace(/[.+^$()|{}]/g, '\\$&').replace(/\*\*/g, '§§').replace(/\*/g, '[^/]*').replace(/§§/g, '.*')
-  return new RegExp('(^|/)' + escaped + '($|/)')
+  const regex = new RegExp('(^|/)' + escaped + '($|/)')
+  if (glob.length <= GLOB_CACHE_MAX_LENGTH) {
+    if (globCache.size >= GLOB_CACHE_LIMIT) globCache.delete(globCache.keys().next().value!)
+    globCache.set(glob, regex)
+  }
+  return regex
 }
 
 export function policyExcludesDir(policy: SecurePolicy, rel: string): boolean {

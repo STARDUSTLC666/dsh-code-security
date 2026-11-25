@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises'
+import { constants, type Stats } from 'node:fs'
 import path from 'node:path'
 
 function outside(root: string, file: string): boolean {
@@ -27,15 +28,28 @@ export async function workspaceTarget(cwd: string, target = '.'): Promise<string
   return absolute
 }
 
+function sameFile(left: Stats, right: Stats): boolean { return left.dev === right.dev && left.ino === right.ino }
+
 /** Read at most the configured file budget, including when the file grows mid-read. */
-export async function boundedFile(file: string, limit: number, signal?: AbortSignal): Promise<Buffer> {
+export async function boundedFile(file: string, limit: number, signal?: AbortSignal, expected?: Stats, workspaceRoot?: string): Promise<Buffer> {
   signal?.throwIfAborted()
-  const handle = await fs.open(file, 'r')
   const oversized = () => Object.assign(new Error('文件超过大小上限 / File exceeds the size limit'), {code:'SCAN_FILE_TOO_LARGE'})
+  const changed = () => Object.assign(new Error('扫描期间文件已变化 / File changed during scan'), {code:'SCAN_FILE_CHANGED'})
+  const outsideWorkspace = () => Object.assign(new Error('文件已移出当前工作区 / File is outside the workspace'), {code:'SCAN_FILE_OUTSIDE_WORKSPACE'})
+  const canonical = await fs.realpath(file)
+  if (workspaceRoot && outside(workspaceRoot, canonical)) throw outsideWorkspace()
+  const pathInfo = await fs.stat(canonical)
+  if (!pathInfo.isFile() || expected && !sameFile(expected, pathInfo)) throw changed()
+  const flags = constants.O_RDONLY | (process.platform === 'win32' ? 0 : constants.O_NOFOLLOW ?? 0)
+  const handle = await fs.open(canonical, flags)
   try {
     signal?.throwIfAborted()
     const info = await handle.stat()
     if (!info.isFile()) throw new Error('扫描目标不是普通文件 / Scan target is not a regular file')
+    const currentPath = await fs.realpath(file)
+    if (workspaceRoot && outside(workspaceRoot, currentPath)) throw outsideWorkspace()
+    const currentInfo = await fs.stat(currentPath)
+    if (!sameFile(info, pathInfo) || !sameFile(info, currentInfo) || expected && !sameFile(info, expected)) throw changed()
     if (info.size > limit) throw oversized()
     const chunks: Buffer[] = []; let size = 0
     for (;;) {
