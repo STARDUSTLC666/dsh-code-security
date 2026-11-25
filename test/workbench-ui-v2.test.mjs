@@ -307,7 +307,7 @@ test('Workbench UI v2 lazily loads @deepseek-ai/dsh-client-ui-primitives only on
   assert.ok(env.getPrimitivesRequireCount() > 0, 'host primitives are resolved lazily during render')
   assert.equal(pageTree.type, 'section')
   assert.equal(pageTree.props['data-dsh-style'], 'harness')
-  assert.equal(pageTree.props['data-dsh-font'], 'arcade')
+  assert.equal(pageTree.props['data-dsh-font'], 'auto')
   assert.equal(pageTree.props['data-main'], 'true')
 
   const fontTrigger = env.findAll(pageTree, n => n.type === 'HostButton' && String(n.props?.className || '').includes('dsh-font-trigger'))[0]
@@ -340,7 +340,7 @@ test('Standalone fallback mode renders semantic HTML controls and syncs all 13 [
     Array.from(W.DSH_STYLES, s => s.id),
     ['harness', 'cream', 'claude', 'pixel8bit', 'mint', 'glass', 'eink', 'blueprint', 'risograph', 'win98', 'songhui', 'frutiger', 'gazette'],
   )
-  assert.equal(W.DSH_DEFAULT_FONT, 'arcade')
+  assert.equal(W.DSH_DEFAULT_FONT, 'auto')
   assert.deepEqual(
     Array.from(W.DSH_FONTS, f => f.id),
     ['arcade', 'auto', 'songkai', 'fangsong', 'poster', 'retro98', 'serif', 'modern'],
@@ -364,7 +364,7 @@ test('Standalone fallback mode renders semantic HTML controls and syncs all 13 [
   assert.equal(typeof frameNode.props.ref, 'function')
   frameNode.props.ref(innerDialogDom)
   assert.equal(outerDialogDom.getAttribute('data-dsh-style'), 'harness')
-  assert.equal(outerDialogDom.getAttribute('data-dsh-font'), 'arcade')
+  assert.equal(outerDialogDom.getAttribute('data-dsh-font'), 'auto')
   assert.equal(outerDialogDom.getAttribute('data-window-drag-exclude'), '')
 
   // Cycle through all 13 styles and verify localStorage + custom event + portaled dialog sync
@@ -380,7 +380,7 @@ test('Standalone fallback mode renders semantic HTML controls and syncs all 13 [
       env.React.createElement(W.Page, { workbench: true, title: '代码安全', icon: 'shield' }, 'body'),
     ))
     assert.equal(page.props['data-dsh-style'], styleId)
-    assert.equal(page.props['data-dsh-font'], 'arcade')
+    assert.equal(page.props['data-dsh-font'], 'auto')
   }
 
   // Cycle through all 8 font pairings and verify localStorage + custom event + root + portaled dialog sync
@@ -403,7 +403,7 @@ test('Standalone fallback mode renders semantic HTML controls and syncs all 13 [
   const restricted = createMockEnv({ withHostPrimitives: false, storageThrows: true })
   assert.equal(restricted.client.probe.W.readDshStyle(), 'harness')
   assert.equal(restricted.client.probe.W.writeDshStyle('claude'), 'claude')
-  assert.equal(restricted.client.probe.W.readDshFont(), 'arcade')
+  assert.equal(restricted.client.probe.W.readDshFont(), 'auto')
   assert.equal(restricted.client.probe.W.writeDshFont('songkai'), 'songkai')
   env.cleanup()
   restricted.cleanup()
@@ -436,15 +436,15 @@ test('Design system CSS enforces Never-Too-Dark slate, 13 palettes, 8 font pairi
   assert.match(css, /translate:\s*1px 1px/i, 'pixel8bit stepped press')
   assert.match(css, /steps\(2,\s*end\)/i, 'pixel8bit stepped timing')
   assert.match(css, /\.dsh-pixel-cursor/i, 'pixel8bit active row cursor')
-  assert.match(css, /#0f766e/i, 'mint teal accent')
-  assert.match(css, /#f3f7ff/i, 'glass aurora daylight base')
-  assert.match(css, /blur\(14px\)/i, 'glass frosted blur')
+  assert.match(css, /#0f8f6a/i, 'mint emerald accent')
+  assert.match(css, /#eef1fb/i, 'glass aurora daylight base')
+  assert.match(css, /blur\(24px\) saturate\(180%\)/i, 'glass deep frosted blur')
   assert.match(css, /#f2f1ec/i, 'eink warm matte e-paper')
   assert.match(css, /#eaf3fb/i, 'blueprint cyanotype grid')
   assert.match(css, /#ff3e7f/i, 'risograph electric pink')
-  assert.match(css, /#dcdcdc/i, 'win98 platinum bevel')
+  assert.match(css, /#005fb8/i, 'win98 Mica Fluent accent')
   assert.match(css, /#b83b2a/i, 'songhui cinnabar seal')
-  assert.match(css, /#eaf7ff/i, 'frutiger aqua gloss')
+  assert.match(css, /#e4f4ff/i, 'frutiger aqua crystal')
   assert.match(css, /#f6f3ec/i, 'gazette newsprint base')
   assert.match(css, /4px double #161514/i, 'gazette masthead double rule')
   assert.match(css, /#9b1c1c/i, 'gazette crimson seal accent')

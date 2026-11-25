@@ -20,7 +20,7 @@ Projects come from host sessions or completed security tools; the browser cannot
 - **Mechanical Keycap Row**: 3D physical-press filter keys (`All / Crit / High / Med / Low / New`), signature vermilion **▶ Scan code**, **Recheck fixes**, and `◀ Prev / Next ▶` stepper controls.
 - **Code Microscope Inspection Bay**: Shows the `file:line` badge, a fault-highlighted redacted code slice, trigger explanation, CWE remediation guidance, and raised action keys for Copy location, Open file (when the project chat is active), Copy fix prompt, and SARIF / Markdown downloads.
 
-Use **? Tour** in the header for a guided walkthrough, and switch between 13 synced styles (auto-adapting to anodized dark slate in dark mode) and 8 font pairings (`YouYuan Mono` default).
+Use **? Tour** in the header for a guided walkthrough, and switch between 13 synced styles (auto-adapting to anodized dark slate in dark mode) and 8 font pairings (style-matched font by default).
 
 The report header shows the saved scan time, scope and mode. Updating the plugin does not rerun old reports. “New” means a finding is absent from the accepted baseline, not that a vulnerability just appeared.
 
