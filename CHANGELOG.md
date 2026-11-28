@@ -1,5 +1,10 @@
 # 更新记录
 
+## 0.10.5 (2026-11-28)
+
+- 更新详情页现在会保留较新检查的结果，慢轮询返回时不再把版本或任务状态退回旧值。
+- Keep newer update-check results and job status when an older background request finishes later.
+
 ## 0.10.4 (2026-11-25)
 
 - 限制策略读取与 glob 规模，修复字面字符误匹配，为 diff/路径解析设置上限，并核对已打开扫描记录的文件身份。
